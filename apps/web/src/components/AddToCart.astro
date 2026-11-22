@@ -1,0 +1,62 @@
+---
+interface Props {
+  type: 'product' | 'service';
+  id: string;
+  max?: number;
+  disabled?: boolean;
+  disabledLabel?: string;
+}
+const { type, id, max = 20, disabled = false, disabledLabel = 'Agotado' } = Astro.props;
+---
+
+<div class="atc" data-type={type} data-id={id}>
+  {
+    disabled ? (
+      <button class="btn" type="button" disabled>{disabledLabel}</button>
+    ) : (
+      <>
+        {max > 1 && (
+          <div class="field qty">
+            <label for={`qty-${id}`}>Cantidad</label>
+            <input class="input" id={`qty-${id}`} type="number" min="1" max={max} value="1" inputmode="numeric" />
+          </div>
+        )}
+        <button class="btn btn--primary" type="button" data-add>Agregar al carrito</button>
+      </>
+    )
+  }
+  <p class="atc__msg" role="status" aria-live="polite"></p>
+</div>
+
+<style>
+  .atc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: end;
+  }
+  .qty {
+    width: 6rem;
+  }
+  .atc__msg {
+    flex-basis: 100%;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    min-height: 1.2em;
+  }
+</style>
+
+<script>
+  import { addToCart } from '../lib/cart';
+  document.querySelectorAll<HTMLElement>('.atc').forEach((box) => {
+    const btn = box.querySelector<HTMLButtonElement>('[data-add]');
+    btn?.addEventListener('click', () => {
+      const qtyInput = box.querySelector<HTMLInputElement>('input[type=number]');
+      const max = Number(qtyInput?.max ?? 1);
+      const quantity = Math.min(Math.max(1, Math.trunc(Number(qtyInput?.value ?? 1)) || 1), max);
+      addToCart({ type: box.dataset.type === 'service' ? 'service' : 'product', id: box.dataset.id ?? '', quantity });
+      const msg = box.querySelector('.atc__msg');
+      if (msg) msg.innerHTML = 'Agregado al carrito. <a href="/carrito">Ver carrito</a>';
+    });
+  });
+</script>

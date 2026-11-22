@@ -1,0 +1,113 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import Pagination from '../../components/Pagination.astro';
+import { apiGet, type CategoryData, type Paged, type ProductCardData } from '../../lib/site';
+
+const sp = Astro.url.searchParams;
+const q = sp.get('q') ?? '';
+const category = sp.get('category') ?? '';
+const minPrice = sp.get('minPrice') ?? '';
+const maxPrice = sp.get('maxPrice') ?? '';
+const sort = sp.get('sort') ?? 'nuevo';
+const page = Math.max(1, Number(sp.get('page') ?? 1) || 1);
+
+const qs = new URLSearchParams({ page: String(page), pageSize: '12', sort });
+if (q) qs.set('q', q);
+if (category) qs.set('category', category);
+if (minPrice) qs.set('minPrice', minPrice);
+if (maxPrice) qs.set('maxPrice', maxPrice);
+
+const [result, cats] = await Promise.all([
+  apiGet<Paged<ProductCardData>>(`/public/products?${qs}`),
+  apiGet<{ items: CategoryData[] }>('/public/categories'),
+]);
+const activeCat = cats?.items.find((c) => c.slug === category);
+const title = activeCat ? activeCat.name : 'Tienda';
+const hasFilters = Boolean(q || category || minPrice || maxPrice);
+---
+
+<BaseLayout
+  title={title}
+  nav="tienda"
+  description={activeCat?.description ?? 'Cerámica artesanal hecha a mano: tazas, platos, jarrones y más piezas únicas.'}
+  noindex={Boolean(q || minPrice || maxPrice || page > 1)}
+>
+  <div class="container section">
+    <h1>{title}</h1>
+
+    <form class="filters" method="get" action="/tienda">
+      <div class="field"><label for="f-q">Buscar</label><input class="input" id="f-q" type="search" name="q" value={q} placeholder="Taza, jarrón…" /></div>
+      <div class="field">
+        <label for="f-cat">Categoría</label>
+        <select class="select" id="f-cat" name="category">
+          <option value="">Todas</option>
+          {cats?.items.map((c) => <option value={c.slug} selected={c.slug === category}>{c.name}</option>)}
+        </select>
+      </div>
+      <div class="field"><label for="f-min">Precio mínimo</label><input class="input" id="f-min" type="number" name="minPrice" min="0" step="1000" value={minPrice} /></div>
+      <div class="field"><label for="f-max">Precio máximo</label><input class="input" id="f-max" type="number" name="maxPrice" min="0" step="1000" value={maxPrice} /></div>
+      <div class="field">
+        <label for="f-sort">Ordenar por</label>
+        <select class="select" id="f-sort" name="sort">
+          <option value="nuevo" selected={sort === 'nuevo'}>Más recientes</option>
+          <option value="precio_asc" selected={sort === 'precio_asc'}>Precio: menor a mayor</option>
+          <option value="precio_desc" selected={sort === 'precio_desc'}>Precio: mayor a menor</option>
+        </select>
+      </div>
+      <div class="filters__actions">
+        <button class="btn btn--primary" type="submit">Aplicar</button>
+        {hasFilters && <a class="btn" href="/tienda">Limpiar</a>}
+      </div>
+    </form>
+
+    {
+      result === null ? (
+        <p class="state" role="alert">No pudimos cargar los productos en este momento. Intenta de nuevo en unos minutos.</p>
+      ) : result.items.length === 0 ? (
+        <p class="state">No encontramos productos con esos filtros.</p>
+      ) : (
+        <>
+          <p class="count">{result.total} {result.total === 1 ? 'producto' : 'productos'}</p>
+          <div class="grid">{result.items.map((p, i) => <ProductCard product={p} eager={i < 4} />)}</div>
+          <Pagination page={result.page} totalPages={result.totalPages} basePath="/tienda" params={{ q, category, minPrice, maxPrice, sort: sort === 'nuevo' ? '' : sort }} />
+        </>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    margin-bottom: var(--space-5);
+    font-size: var(--text-3xl);
+  }
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: var(--space-4);
+    align-items: end;
+    padding: var(--space-4);
+    border: var(--border-w) solid var(--color-line);
+    margin-bottom: var(--space-5);
+  }
+  .filters__actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .count {
+    font-size: var(--text-sm);
+    color: var(--color-ink-mute);
+    margin-bottom: var(--space-4);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: var(--space-6) var(--space-5);
+  }
+  .state {
+    padding: var(--space-7);
+    text-align: center;
+    border: var(--border-w) dashed var(--color-line);
+  }
+</style>

@@ -1,0 +1,94 @@
+---
+interface Props {
+  serviceId?: string | null;
+  submitLabel?: string;
+  detailsLabel?: string;
+  showDate?: boolean;
+}
+const { serviceId = null, submitLabel = 'Enviar solicitud', detailsLabel = 'Cuéntanos qué necesitas', showDate = true } = Astro.props;
+---
+
+<form class="qf" id="quote-form" data-service={serviceId ?? ''} novalidate>
+  <div class="grid-2">
+    <div class="field"><label for="q-name">Nombre</label><input class="input" id="q-name" name="name" autocomplete="name" required /></div>
+    <div class="field"><label for="q-email">Correo electrónico</label><input class="input" id="q-email" name="email" type="email" autocomplete="email" required /></div>
+    <div class="field"><label for="q-phone">Teléfono / WhatsApp</label><input class="input" id="q-phone" name="phone" type="tel" autocomplete="tel" /></div>
+    {showDate && <div class="field"><label for="q-date">Fecha deseada</label><input class="input" id="q-date" name="desiredDate" type="date" /></div>}
+  </div>
+  <div class="field"><label for="q-details">{detailsLabel}</label><textarea class="textarea" id="q-details" name="details" required minlength="10"></textarea></div>
+  <!-- Honeypot anti-spam: los humanos no lo ven -->
+  <div class="hp" aria-hidden="true"><label>Sitio web<input name="website" tabindex="-1" autocomplete="off" /></label></div>
+  <label class="check">
+    <input type="checkbox" name="acceptDataPolicy" required />
+    <span>Autorizo el tratamiento de mis datos personales según la <a href="/privacidad">política de privacidad</a> (Ley 1581 de 2012).</span>
+  </label>
+  <p class="msg" id="quote-msg" role="alert"></p>
+  <button class="btn btn--primary" type="submit">{submitLabel}</button>
+</form>
+
+<style>
+  .qf {
+    display: grid;
+    gap: var(--space-4);
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+  }
+  .msg {
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .msg.is-error {
+    color: var(--color-danger);
+  }
+  .msg.is-ok {
+    color: var(--color-success);
+  }
+</style>
+
+<script>
+  import { API_URL } from '../lib/site';
+  const form = document.getElementById('quote-form') as HTMLFormElement | null;
+  const msg = document.getElementById('quote-msg');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!msg) return;
+    msg.className = 'msg';
+    msg.textContent = '';
+    const d = new FormData(form);
+    const body = {
+      serviceId: form.dataset.service || null,
+      name: String(d.get('name') ?? ''),
+      email: String(d.get('email') ?? ''),
+      phone: String(d.get('phone') ?? ''),
+      desiredDate: String(d.get('desiredDate') ?? '') || null,
+      details: String(d.get('details') ?? ''),
+      acceptDataPolicy: d.get('acceptDataPolicy') === 'on',
+      website: String(d.get('website') ?? ''),
+    };
+    const btn = form.querySelector('button[type=submit]') as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API_URL}/public/quotes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: { message?: string; fields?: { message: string }[] } };
+      if (!res.ok) {
+        msg.className = 'msg is-error';
+        msg.textContent = data.error?.fields?.map((f) => f.message).join(' · ') ?? data.error?.message ?? 'No se pudo enviar. Intenta de nuevo.';
+        return;
+      }
+      form.reset();
+      msg.className = 'msg is-ok';
+      msg.textContent = '¡Gracias! Recibimos tu solicitud y te escribiremos pronto.';
+    } catch {
+      msg.className = 'msg is-error';
+      msg.textContent = 'No pudimos conectar con el servidor. Intenta de nuevo.';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>

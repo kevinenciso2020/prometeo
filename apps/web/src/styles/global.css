@@ -194,3 +194,30 @@ h2 {
   text-align: center;
   color: var(--color-ink-mute);
 }
+
+.container {
+  width: min(100% - 2 * var(--space-4), var(--container));
+  margin-inline: auto;
+}
+.section {
+  padding-block: var(--space-8);
+}
+.eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.prose {
+  max-width: 44rem;
+}
+.prose > * + * {
+  margin-top: var(--space-4);
+}
+.prose h2 {
+  margin-top: var(--space-6);
+}
+.link-arrow {
+  font-weight: 600;
+  text-underline-offset: 4px;
+}

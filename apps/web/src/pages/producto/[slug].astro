@@ -1,0 +1,217 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Picture from '../../components/Picture.astro';
+import AddToCart from '../../components/AddToCart.astro';
+import { formatCop } from '@prometeo/shared';
+import { apiGet, SITE_URL } from '../../lib/site';
+import { cld, ogImage } from '../../lib/images';
+
+interface ProductDetail {
+  id: string; name: string; slug: string; description: string; price: number; compareAtPrice: number | null; stock: number;
+  sku: string | null; weightGrams: number | null; widthMm: number | null; heightMm: number | null; depthMm: number | null;
+  materials: string | null; isUnique: boolean; categoryName: string | null; categorySlug: string | null;
+  images: { url: string; alt: string | null }[];
+}
+
+const { slug } = Astro.params;
+const res = await apiGet<{ item: ProductDetail }>(`/public/products/${encodeURIComponent(slug ?? '')}`);
+if (!res) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+const p = res.item;
+const main = p.images[0]?.url ?? null;
+const inStock = p.stock > 0;
+const onSale = p.compareAtPrice !== null && p.compareAtPrice > p.price;
+const stockLabel = !inStock
+  ? 'Agotado'
+  : p.isUnique
+    ? 'Pieza única — solo hay una'
+    : p.stock <= 3
+      ? `Últimas ${p.stock} unidades`
+      : 'Disponible';
+const cm = (mm: number) => `${(mm / 10).toLocaleString('es-CO', { maximumFractionDigits: 1 })} cm`;
+const dims = [p.widthMm && `Ancho ${cm(p.widthMm)}`, p.heightMm && `Alto ${cm(p.heightMm)}`, p.depthMm && `Fondo ${cm(p.depthMm)}`].filter(Boolean);
+const description = (p.description || `${p.name}, pieza de cerámica artesanal hecha a mano.`).slice(0, 160);
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: p.name,
+  description,
+  sku: p.sku ?? undefined,
+  image: p.images.map((i) => cld(i.url, 1200)),
+  material: p.materials ?? undefined,
+  brand: { '@type': 'Brand', name: 'Prometeo' },
+  offers: {
+    '@type': 'Offer',
+    url: `${SITE_URL}/producto/${p.slug}`,
+    priceCurrency: 'COP',
+    price: p.price,
+    availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    itemCondition: 'https://schema.org/NewCondition',
+  },
+};
+const breadcrumbs = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Tienda', item: `${SITE_URL}/tienda` },
+    { '@type': 'ListItem', position: 2, name: p.name, item: `${SITE_URL}/producto/${p.slug}` },
+  ],
+};
+---
+
+<BaseLayout title={p.name} nav="tienda" description={description} image={ogImage(main)} ogType="product" structuredData={[jsonLd, breadcrumbs]}>
+  <div class="container section">
+    <nav class="crumbs" aria-label="Ruta">
+      <a href="/tienda">Tienda</a>
+      {p.categorySlug && <Fragment> / <a href={`/tienda?category=${p.categorySlug}`}>{p.categoryName}</a></Fragment>}
+    </nav>
+
+    <div class="layout">
+      <div class="gallery">
+        <div id="main-pic"><Picture src={main} alt={p.images[0]?.alt ?? p.name} ratio="4 / 5" width={1024} sizes="(min-width: 60rem) 45vw, 100vw" eager class="main" /></div>
+        {
+          p.images.length > 1 && (
+            <ul class="thumbs" role="list" aria-label="Más fotos">
+              {p.images.map((img, i) => (
+                <li>
+                  <button type="button" data-full={cld(img.url, 1024, 'c_fill')} data-alt={img.alt ?? p.name} aria-label={`Ver foto ${i + 1}`} aria-pressed={i === 0}>
+                    <img src={cld(img.url, 160, 'c_fill,ar_1:1')} alt="" loading="lazy" width="80" height="80" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </div>
+
+      <div class="info">
+        {p.categoryName && <p class="eyebrow">{p.categoryName}</p>}
+        <h1>{p.name}</h1>
+        <p class="price">
+          <strong>{formatCop(p.price)}</strong>
+          {onSale && p.compareAtPrice !== null && <s>{formatCop(p.compareAtPrice)}</s>}
+        </p>
+        <p class="stock">
+          {stockLabel}
+        </p>
+        <AddToCart type="product" id={p.id} max={p.isUnique ? 1 : Math.min(p.stock, 20)} disabled={!inStock} />
+        {p.description && <div class="prose desc"><p>{p.description}</p></div>}
+        <dl class="specs">
+          {p.materials && (<Fragment><dt>Materiales</dt><dd>{p.materials}</dd></Fragment>)}
+          {dims.length > 0 && (<Fragment><dt>Medidas</dt><dd>{dims.join(' · ')}</dd></Fragment>)}
+          {p.weightGrams && (<Fragment><dt>Peso</dt><dd>{p.weightGrams.toLocaleString('es-CO')} g</dd></Fragment>)}
+          {p.sku && (<Fragment><dt>Referencia</dt><dd>{p.sku}</dd></Fragment>)}
+        </dl>
+        <p class="note">Cada pieza es hecha a mano: puede tener pequeñas variaciones de color y forma. Consulta nuestra <a href="/envios-y-devoluciones">política de envíos y devoluciones</a>.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const mainBox = document.getElementById('main-pic');
+    document.querySelectorAll<HTMLButtonElement>('.thumbs button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const img = mainBox?.querySelector('img');
+        if (!img) return;
+        img.removeAttribute('srcset');
+        img.src = btn.dataset.full ?? img.src;
+        img.alt = btn.dataset.alt ?? '';
+        document.querySelectorAll('.thumbs button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      });
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .crumbs {
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-5);
+    color: var(--color-ink-soft);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: var(--space-7);
+    align-items: start;
+  }
+  :global(.main) {
+    border: var(--border-w) solid var(--color-line);
+  }
+  .thumbs {
+    display: flex;
+    gap: var(--space-2);
+    padding: 0;
+    margin-top: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .thumbs button {
+    padding: 0;
+    border: var(--border-w) solid var(--color-line-soft);
+    background: none;
+    line-height: 0;
+  }
+  .thumbs button[aria-pressed='true'] {
+    border-color: var(--color-ink);
+  }
+  .thumbs img {
+    width: 4.5rem;
+    height: 4.5rem;
+    object-fit: cover;
+  }
+  .info {
+    display: grid;
+    gap: var(--space-4);
+    position: sticky;
+    top: 6rem;
+  }
+  h1 {
+    font-size: var(--text-2xl);
+  }
+  .price {
+    display: flex;
+    gap: var(--space-3);
+    align-items: baseline;
+    font-size: var(--text-xl);
+  }
+  .price s {
+    font-size: var(--text-base);
+    color: var(--color-ink-mute);
+  }
+  .stock {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .specs {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-2) var(--space-5);
+    font-size: var(--text-sm);
+    border-top: 1px solid var(--color-line-soft);
+    padding-top: var(--space-4);
+  }
+  dt {
+    font-weight: 600;
+  }
+  dd {
+    margin: 0;
+  }
+  .desc p {
+    white-space: pre-line;
+  }
+  .note {
+    font-size: var(--text-xs);
+    color: var(--color-ink-mute);
+  }
+  @media (max-width: 800px) {
+    .layout {
+      grid-template-columns: 1fr;
+      gap: var(--space-5);
+    }
+    .info {
+      position: static;
+    }
+  }
+</style>

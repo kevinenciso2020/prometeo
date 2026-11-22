@@ -81,13 +81,11 @@ export async function syncImages(
       await db.update(table).set(common).where(eq(table.id, rowId));
     } else {
       // Las tablas comparten forma; solo cambia el nombre de la columna padre.
-      await db
-        .insert(table)
-        .values({
-          ...common,
-          publicId: img.publicId,
-          [fkKey]: parentId,
-        } as typeof productImages.$inferInsert);
+      await db.insert(table).values({
+        ...common,
+        publicId: img.publicId,
+        [fkKey]: parentId,
+      } as typeof productImages.$inferInsert);
     }
   }
   return removed.map((r) => r.publicId);

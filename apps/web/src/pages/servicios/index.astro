@@ -1,0 +1,83 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Picture from '../../components/Picture.astro';
+import { formatCop } from '@prometeo/shared';
+import { apiGet, type ServiceData } from '../../lib/site';
+
+const res = await apiGet<{ items: ServiceData[] }>('/public/services');
+---
+
+<BaseLayout title="Servicios" nav="servicios" description="Talleres privados y empresariales, encargos personalizados y alquiler de horno en Prometeo.">
+  <div class="container section">
+    <h1>Servicios</h1>
+    <p class="lead">Más allá de la tienda: talleres, encargos y acompañamiento para tus proyectos en cerámica.</p>
+    {
+      res === null ? (
+        <p class="state" role="alert">No pudimos cargar los servicios. Intenta de nuevo en unos minutos.</p>
+      ) : res.items.length === 0 ? (
+        <p class="state">Pronto publicaremos nuestros servicios. <a href="/contacto">Escríbenos</a> si necesitas algo.</p>
+      ) : (
+        <ul class="list" role="list">
+          {res.items.map((s, i) => (
+            <li>
+              <a href={`/servicios/${s.slug}`}>
+                <Picture src={s.image} alt={s.name} ratio="4 / 3" sizes="(min-width: 60rem) 30vw, 90vw" eager={i < 2} />
+                <div class="body">
+                  <h2>{s.name}</h2>
+                  <p>{s.description.slice(0, 140)}{s.description.length > 140 ? '…' : ''}</p>
+                  <p class="meta">{s.mode === 'pago_online' && s.price !== null ? formatCop(s.price) : s.price !== null ? `Desde ${formatCop(s.price)}` : 'Cotización'}</p>
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+  }
+  .lead {
+    font-size: var(--text-lg);
+    max-width: 40rem;
+    margin-block: var(--space-3) var(--space-6);
+  }
+  .list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: var(--space-6);
+    padding: 0;
+  }
+  .list a {
+    display: grid;
+    border: var(--border-w) solid var(--color-line);
+    text-decoration: none;
+    height: 100%;
+    transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  }
+  .list a:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-hard);
+  }
+  .body {
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-2);
+    align-content: start;
+  }
+  h2 {
+    font-size: var(--text-xl);
+  }
+  .meta {
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .state {
+    padding: var(--space-7);
+    text-align: center;
+    border: var(--border-w) dashed var(--color-line);
+  }
+</style>

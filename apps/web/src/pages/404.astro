@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+Astro.response.status = 404;
+---
+
+<BaseLayout title="Página no encontrada" noindex cacheable={false}>
+  <div class="container section">
+    <p class="eyebrow">Error 404</p>
+    <h1>No encontramos esa página</h1>
+    <p>Puede que el enlace haya cambiado o que la pieza ya no esté disponible.</p>
+    <p class="actions"><a class="btn btn--primary" href="/tienda">Ir a la tienda</a><a class="btn" href="/">Volver al inicio</a></p>
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-block: var(--space-2) var(--space-4);
+  }
+  .actions {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+    flex-wrap: wrap;
+  }
+</style>

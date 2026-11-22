@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import QuoteForm from '../components/QuoteForm.astro';
+import { getSettings, whatsappUrl } from '../lib/site';
+
+const s = await getSettings();
+const wa = whatsappUrl(s.contact.whatsapp);
+---
+
+<BaseLayout title="Contacto" nav="contacto" description="Escríbenos para resolver dudas, agendar una visita al taller o pedir un encargo.">
+  <div class="container section">
+    <h1>Contacto</h1>
+    <div class="layout">
+      <div class="info">
+        <p class="lead">Cuéntanos qué tienes en mente. Te respondemos lo antes posible.</p>
+        <ul role="list">
+          {s.contact.email && <li><strong>Correo</strong><br /><a href={`mailto:${s.contact.email}`}>{s.contact.email}</a></li>}
+          {s.contact.phone && <li><strong>Teléfono</strong><br /><a href={`tel:${s.contact.phone.replace(/\s/g, '')}`}>{s.contact.phone}</a></li>}
+          {wa && <li><strong>WhatsApp</strong><br /><a href={wa} target="_blank" rel="noopener">Escríbenos por WhatsApp</a></li>}
+          {s.contact.address && <li><strong>Taller</strong><br />{s.contact.address}</li>}
+          {s.contact.hours && <li><strong>Horario</strong><br />{s.contact.hours}</li>}
+        </ul>
+      </div>
+      <div class="card-box">
+        <QuoteForm showDate={false} detailsLabel="Tu mensaje" submitLabel="Enviar mensaje" />
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-bottom: var(--space-5);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: var(--space-7);
+    align-items: start;
+  }
+  .lead {
+    font-size: var(--text-lg);
+    margin-bottom: var(--space-5);
+  }
+  ul {
+    padding: 0;
+    display: grid;
+    gap: var(--space-4);
+  }
+  .card-box {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: var(--space-5);
+  }
+  @media (max-width: 800px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

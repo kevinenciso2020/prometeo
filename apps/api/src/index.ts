@@ -9,6 +9,7 @@ import { adminRoutes } from './routes/admin';
 import { createCloudinary, type CloudinaryClient } from './lib/cloudinary';
 import { authRoutes } from './routes/auth';
 import { health } from './routes/health';
+import { publicRoutes } from './routes/public';
 
 export interface AppDeps {
   /** Inyectables para tests. Por defecto: Neon (HTTP) y Resend/consola. */
@@ -44,6 +45,7 @@ export function createApp(deps: AppDeps = {}) {
   app.route('/health', health);
   app.route('/auth', authRoutes);
   app.route('/admin', adminRoutes);
+  app.route('/public', publicRoutes);
 
   app.onError(onError);
   app.notFound(onNotFound);

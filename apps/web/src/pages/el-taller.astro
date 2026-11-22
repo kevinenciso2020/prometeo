@@ -1,0 +1,28 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="El taller" nav="taller" description="Conoce Prometeo: un taller de cerámica artesanal donde el barro, el fuego y las manos dan forma a piezas únicas.">
+  <div class="container section">
+    <p class="eyebrow">Sobre nosotros</p>
+    <h1>El taller</h1>
+    <div class="prose">
+      <p class="lead">Prometeo es un taller de cerámica donde cada pieza nace del barro, pasa por el fuego y llega a tus manos con la huella de quien la hizo.</p>
+      <p>Trabajamos con técnicas de torno y modelado a mano, esmaltes propios y hornadas pequeñas. Por eso cada pieza es distinta: pequeñas variaciones de color y forma son parte de su carácter.</p>
+      <h2>Lo que hacemos</h2>
+      <p>Diseñamos y producimos piezas utilitarias y decorativas, recibimos encargos personalizados y compartimos el oficio a través de cursos y talleres para quienes quieren aprender a trabajar el barro.</p>
+      <h2>Ven a conocernos</h2>
+      <p>Escríbenos desde la página de <a href="/contacto">contacto</a> para agendar una visita, resolver dudas o contarnos tu proyecto.</p>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-block: var(--space-2) var(--space-5);
+  }
+  .lead {
+    font-size: var(--text-lg);
+  }
+</style>

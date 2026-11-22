@@ -1,0 +1,75 @@
+---
+import { formatCop } from '@prometeo/shared';
+import type { ProductCardData } from '../lib/site';
+import Picture from './Picture.astro';
+
+interface Props {
+  product: ProductCardData;
+  eager?: boolean;
+}
+const { product: p, eager = false } = Astro.props;
+const soldOut = p.stock <= 0;
+const onSale = p.compareAtPrice !== null && p.compareAtPrice > p.price;
+---
+
+<article class="card">
+  <a href={`/producto/${p.slug}`} class="card__link">
+    <div class="card__media">
+      <Picture src={p.image} alt={p.name} ratio="4 / 5" eager={eager} />
+      {soldOut && <span class="tag">Agotado</span>}
+      {!soldOut && p.isUnique && <span class="tag">Pieza única</span>}
+      {!soldOut && onSale && !p.isUnique && <span class="tag">Oferta</span>}
+    </div>
+    <div class="card__body">
+      {p.categoryName && <p class="eyebrow">{p.categoryName}</p>}
+      <h3>{p.name}</h3>
+      <p class="price">
+        <strong>{formatCop(p.price)}</strong>
+        {onSale && p.compareAtPrice !== null && <s>{formatCop(p.compareAtPrice)}</s>}
+      </p>
+    </div>
+  </a>
+</article>
+
+<style>
+  .card__link {
+    display: grid;
+    gap: var(--space-3);
+    text-decoration: none;
+  }
+  .card__media {
+    position: relative;
+    border: var(--border-w) solid var(--color-line);
+    transition:
+      transform var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease);
+  }
+  .card__link:hover .card__media {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-hard);
+  }
+  .tag {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    background: var(--color-ink);
+    color: var(--color-inverse-ink);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.15rem 0.5rem;
+  }
+  h3 {
+    font-size: var(--text-lg);
+  }
+  .price {
+    display: flex;
+    gap: var(--space-2);
+    align-items: baseline;
+    font-size: var(--text-sm);
+  }
+  .price s {
+    color: var(--color-ink-mute);
+  }
+</style>

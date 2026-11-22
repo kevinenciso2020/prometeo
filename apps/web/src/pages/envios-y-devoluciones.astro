@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalPage from '../components/LegalPage.astro';
+import { getSettings } from '../lib/site';
+
+const s = await getSettings();
+---
+
+<BaseLayout title="Envíos y devoluciones" description="Política de envíos, cambios, devoluciones y derecho de retracto (Ley 1480 de 2011).">
+  <div class="container section">
+    <h1>Envíos y devoluciones</h1>
+    <LegalPage text={s.legal.shipping_returns} />
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-5);
+  }
+</style>

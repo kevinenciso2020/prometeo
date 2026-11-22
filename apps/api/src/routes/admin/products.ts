@@ -44,7 +44,7 @@ productsRoutes.get('/', validate('query', listQuerySchema), async (c) => {
       categoryId: products.categoryId,
       thumb: sql<
         string | null
-      >`(select url from ${productImages} pi where pi.product_id = ${products.id} order by pi.is_primary desc, pi.sort_order asc limit 1)`,
+      >`(select pi.url from product_images pi where pi.product_id = "products"."id" order by pi.is_primary desc, pi.sort_order asc limit 1)`,
     })
     .from(products)
     .where(where)

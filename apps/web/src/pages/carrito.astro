@@ -1,0 +1,264 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Carrito" description="Tu carrito de compras en Prometeo." noindex cacheable={false}>
+  <div class="container section">
+    <h1>Carrito</h1>
+    <div id="state" role="status" aria-live="polite">Cargando tu carrito…</div>
+    <div class="layout" id="cart" hidden>
+      <ul class="lines" id="lines" role="list"></ul>
+      <aside class="summary" aria-label="Resumen">
+        <h2>Resumen</h2>
+        <dl>
+          <dt>Subtotal</dt><dd id="subtotal"></dd>
+          <dt>Envío</dt><dd id="shipping"></dd>
+          <dt class="total">Total</dt><dd class="total" id="total"></dd>
+        </dl>
+        <p class="hint" id="free-hint"></p>
+        <button class="btn btn--primary" type="button" id="checkout" disabled aria-disabled="true">Finalizar compra</button>
+        <p class="hint">El pago en línea con Wompi se habilita en la siguiente etapa del proyecto.</p>
+        <button class="btn btn--sm" type="button" id="clear">Vaciar carrito</button>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    import { formatCop } from '@prometeo/shared';
+    import { API_URL } from '../lib/site';
+    import { cld } from '../lib/images';
+    import { readCart, removeFromCart, setQuantity } from '../lib/cart';
+    import { clearCart } from '../lib/cart';
+
+    interface Line {
+      type: 'product' | 'service';
+      id: string;
+      name?: string;
+      slug?: string;
+      image?: string | null;
+      unitPrice?: number;
+      quantity?: number;
+      stock?: number | null;
+      available: boolean;
+      lineTotal?: number;
+      reason?: string | null;
+    }
+    interface Quote {
+      lines: Line[];
+      subtotal: number;
+      shipping: number;
+      total: number;
+      freeShippingThreshold: number | null;
+    }
+
+    const state = document.getElementById('state') as HTMLElement;
+    const cart = document.getElementById('cart') as HTMLElement;
+    const linesEl = document.getElementById('lines') as HTMLElement;
+    const set = (id: string, v: string) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v;
+    };
+
+    function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    function renderLine(l: Line): HTMLLIElement {
+      const li = el('li', l.available ? 'line' : 'line is-off');
+      if (l.image) {
+        const img = el('img');
+        img.src = cld(l.image, 200, 'c_fill,ar_1:1');
+        img.alt = '';
+        img.width = 96;
+        img.height = 96;
+        img.loading = 'lazy';
+        li.append(img);
+      } else li.append(el('div', 'ph'));
+
+      const info = el('div', 'info');
+      const title = l.slug && l.type === 'product' ? el('a', 'name') : el('span', 'name');
+      title.textContent = l.name ?? 'Producto no disponible';
+      if (title instanceof HTMLAnchorElement) title.href = `/producto/${l.slug}`;
+      info.append(title);
+      if (l.reason) info.append(el('span', 'reason', l.reason));
+      if (l.unitPrice !== undefined) info.append(el('span', 'unit', `${formatCop(l.unitPrice)} c/u`));
+
+      const ctrl = el('div', 'ctrl');
+      if (l.available || l.stock) {
+        const label = el('label', 'sr-only', 'Cantidad');
+        const input = el('input', 'input');
+        input.type = 'number';
+        input.min = '1';
+        input.max = String(l.type === 'service' ? 10 : Math.min(l.stock ?? 20, 20));
+        input.value = String(l.quantity ?? 1);
+        input.setAttribute('aria-label', `Cantidad de ${l.name ?? 'producto'}`);
+        input.addEventListener('change', () => {
+          setQuantity(l.type, l.id, Math.max(1, Math.trunc(Number(input.value)) || 1));
+          void load();
+        });
+        ctrl.append(label, input);
+      }
+      const rm = el('button', 'btn btn--sm', 'Quitar');
+      rm.type = 'button';
+      rm.addEventListener('click', () => {
+        removeFromCart(l.type, l.id);
+        void load();
+      });
+      ctrl.append(rm);
+
+      const total = el('strong', 'total', l.available ? formatCop(l.lineTotal ?? 0) : '—');
+      li.append(info, ctrl, total);
+      return li;
+    }
+
+    async function load() {
+      const items = readCart();
+      if (items.length === 0) {
+        cart.hidden = true;
+        state.hidden = false;
+        state.innerHTML = '<p>Tu carrito está vacío.</p><p><a class="btn btn--primary" href="/tienda">Ir a la tienda</a></p>';
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/public/cart/quote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        });
+        if (!res.ok) throw new Error('quote');
+        const q = (await res.json()) as Quote;
+        linesEl.replaceChildren(...q.lines.map(renderLine));
+        set('subtotal', formatCop(q.subtotal));
+        set('shipping', q.shipping === 0 ? (q.subtotal > 0 ? 'Gratis' : '—') : formatCop(q.shipping));
+        set('total', formatCop(q.total));
+        const missing = q.freeShippingThreshold !== null && q.shipping > 0 ? q.freeShippingThreshold - q.subtotal : 0;
+        set('free-hint', missing > 0 ? `Te faltan ${formatCop(missing)} para tener envío gratis.` : '');
+        state.hidden = true;
+        cart.hidden = false;
+      } catch {
+        cart.hidden = true;
+        state.hidden = false;
+        state.textContent = 'No pudimos actualizar tu carrito. Intenta de nuevo en unos minutos.';
+      }
+    }
+
+    document.getElementById('clear')?.addEventListener('click', () => {
+      clearCart();
+      void load();
+    });
+    void load();
+  </script>
+</BaseLayout>
+
+<style is:global>
+  .lines {
+    display: grid;
+    gap: var(--space-4);
+    padding: 0;
+  }
+  .line {
+    display: grid;
+    grid-template-columns: 6rem 1fr auto auto;
+    gap: var(--space-4);
+    align-items: center;
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--color-line-soft);
+  }
+  .line img,
+  .line .ph {
+    width: 6rem;
+    height: 6rem;
+    object-fit: cover;
+    border: var(--border-w) solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .line .info {
+    display: grid;
+    gap: var(--space-1);
+  }
+  .line .name {
+    font-weight: 600;
+  }
+  .line .unit {
+    font-size: var(--text-sm);
+    color: var(--color-ink-mute);
+  }
+  .line .reason {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-danger);
+  }
+  .line .ctrl {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+  }
+  .line .ctrl .input {
+    width: 4.5rem;
+    min-height: 2rem;
+  }
+  .line.is-off {
+    opacity: 0.7;
+  }
+  @media (max-width: 640px) {
+    .line {
+      grid-template-columns: 5rem 1fr;
+    }
+    .line .total {
+      grid-column: 2;
+    }
+  }
+</style>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-bottom: var(--space-5);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 20rem;
+    gap: var(--space-7);
+    align-items: start;
+  }
+  .summary {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-3);
+    position: sticky;
+    top: 6rem;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-2);
+    margin: 0;
+  }
+  dd {
+    margin: 0;
+    text-align: right;
+  }
+  .total {
+    font-weight: 700;
+    font-size: var(--text-lg);
+    border-top: 1px solid var(--color-line);
+    padding-top: var(--space-2);
+  }
+  .hint {
+    font-size: var(--text-xs);
+    color: var(--color-ink-mute);
+  }
+  @media (max-width: 800px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .summary {
+      position: static;
+    }
+  }
+</style>

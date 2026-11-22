@@ -19,6 +19,7 @@ export interface Bindings {
   CLOUDINARY_CLOUD_NAME: string;
   // Rate limiting
   RL_AUTH?: RateLimit;
+  RL_PUBLIC?: RateLimit;
 }
 
 export interface AuthUser {

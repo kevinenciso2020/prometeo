@@ -1,0 +1,119 @@
+---
+interface Props {
+  current?: string;
+}
+const { current = '' } = Astro.props;
+const links = [
+  { href: '/tienda', key: 'tienda', label: 'Tienda' },
+  { href: '/servicios', key: 'servicios', label: 'Servicios' },
+  { href: '/el-taller', key: 'taller', label: 'El taller' },
+  { href: '/contacto', key: 'contacto', label: 'Contacto' },
+];
+---
+
+<header class="head">
+  <div class="container head__in">
+    <a class="logo" href="/" aria-label="Prometeo, inicio">Prometeo</a>
+    <button class="menu-btn btn btn--sm" type="button" aria-expanded="false" aria-controls="nav" id="menu-btn">Menú</button>
+    <nav id="nav" class="nav" aria-label="Principal">
+      <ul role="list">
+        {links.map((l) => (
+          <li><a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.label}</a></li>
+        ))}
+      </ul>
+    </nav>
+    <a class="cart btn btn--sm" href="/carrito" aria-label="Carrito de compras">
+      Carrito <span class="cart__n" id="cart-count" aria-live="polite">0</span>
+    </a>
+  </div>
+</header>
+
+<style>
+  .head {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--color-bg);
+    border-bottom: var(--border-w) solid var(--color-line);
+  }
+  .head__in {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    min-height: 4.25rem;
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+  }
+  .nav {
+    margin-left: auto;
+  }
+  .nav ul {
+    display: flex;
+    gap: var(--space-5);
+    padding: 0;
+  }
+  .nav a {
+    text-decoration: none;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    padding-block: var(--space-2);
+    border-bottom: 2px solid transparent;
+  }
+  .nav a:hover,
+  .nav a[aria-current='page'] {
+    border-bottom-color: var(--color-ink);
+  }
+  .cart__n {
+    background: var(--color-ink);
+    color: var(--color-inverse-ink);
+    min-width: 1.3rem;
+    padding: 0 0.3rem;
+    text-align: center;
+    margin-left: var(--space-1);
+  }
+  .menu-btn {
+    display: none;
+    margin-left: auto;
+  }
+  @media (max-width: 760px) {
+    .menu-btn {
+      display: inline-flex;
+    }
+    .nav {
+      display: none;
+      position: absolute;
+      inset: 100% 0 auto 0;
+      background: var(--color-bg);
+      border-bottom: var(--border-w) solid var(--color-line);
+      padding: var(--space-4);
+    }
+    .nav.is-open {
+      display: block;
+    }
+    .nav ul {
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+  }
+</style>
+
+<script>
+  import { cartCount } from '../lib/cart';
+  const out = document.getElementById('cart-count');
+  const sync = () => {
+    if (out) out.textContent = String(cartCount());
+  };
+  sync();
+  window.addEventListener('cart:change', sync);
+  window.addEventListener('storage', sync);
+  const btn = document.getElementById('menu-btn');
+  const nav = document.getElementById('nav');
+  btn?.addEventListener('click', () => {
+    const open = nav?.classList.toggle('is-open') ?? false;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+</script>

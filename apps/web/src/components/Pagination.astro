@@ -1,0 +1,37 @@
+---
+interface Props {
+  page: number;
+  totalPages: number;
+  basePath: string;
+  params?: Record<string, string | undefined>;
+}
+const { page, totalPages, basePath, params = {} } = Astro.props;
+function href(n: number): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) q.set(k, v);
+  if (n > 1) q.set('page', String(n));
+  const s = q.toString();
+  return s ? `${basePath}?${s}` : basePath;
+}
+---
+
+{
+  totalPages > 1 && (
+    <nav class="pager" aria-label="Paginación">
+      {page > 1 ? <a class="btn btn--sm" href={href(page - 1)} rel="prev">← Anterior</a> : <span />}
+      <span>Página {page} de {totalPages}</span>
+      {page < totalPages ? <a class="btn btn--sm" href={href(page + 1)} rel="next">Siguiente →</a> : <span />}
+    </nav>
+  )
+}
+
+<style>
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+    font-size: var(--text-sm);
+  }
+</style>

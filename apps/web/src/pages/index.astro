@@ -1,15 +1,193 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Picture from '../components/Picture.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { apiGet, SITE_URL, type CategoryData, type Paged, type ProductCardData, type ServiceData } from '../lib/site';
+import { ogImage } from '../lib/images';
+
+const [featured, categories, services] = await Promise.all([
+  apiGet<Paged<ProductCardData>>('/public/products?featured=true&pageSize=4'),
+  apiGet<{ items: CategoryData[] }>('/public/categories'),
+  apiGet<{ items: ServiceData[] }>('/public/services'),
+]);
+const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
 ---
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Prometeo · Taller de cerámica</title>
-  </head>
-  <body>
-    <main>
-      <h1>Prometeo</h1>
-      <p>Sitio en construcción.</p>
-    </main>
-  </body>
-</html>
+
+<BaseLayout
+  description="Taller de cerámica artesanal: piezas únicas hechas a mano, cursos de torno y modelado, y encargos personalizados."
+  image={ogImage(heroImage)}
+  structuredData={{ '@context': 'https://schema.org', '@type': 'Organization', name: 'Prometeo', url: SITE_URL }}
+>
+  <section class="hero">
+    <div class="container hero__in">
+      <div class="hero__text">
+        <p class="eyebrow">Taller de cerámica artesanal</p>
+        <h1>Barro, fuego<br />y manos.</h1>
+        <p>Piezas únicas hechas a mano, cursos para aprender el oficio y encargos a tu medida.</p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="/tienda">Ver la tienda</a>
+          <a class="btn" href="/servicios">Servicios</a>
+        </div>
+      </div>
+      <Picture src={heroImage} alt="Pieza de cerámica de Prometeo" ratio="4 / 5" width={1024} sizes="(min-width: 60rem) 40vw, 90vw" eager class="hero__pic" />
+    </div>
+  </section>
+
+  {
+    categories && categories.items.length > 0 && (
+      <section class="strip" aria-label="Categorías">
+        <ul class="container" role="list">
+          {categories.items.map((c) => <li><a href={`/tienda?category=${c.slug}`}>{c.name}</a></li>)}
+        </ul>
+      </section>
+    )
+  }
+
+  <section class="section container">
+    <div class="head"><h2>Destacados</h2><a class="link-arrow" href="/tienda">Ver todo →</a></div>
+    {
+      featured && featured.items.length > 0 ? (
+        <div class="grid">{featured.items.map((p, i) => <ProductCard product={p} eager={i < 2} />)}</div>
+      ) : (
+        <p class="muted">Pronto publicaremos nuevas piezas.</p>
+      )
+    }
+  </section>
+
+  {
+    services && services.items.length > 0 && (
+      <section class="section container">
+        <div class="head"><h2>Servicios</h2><a class="link-arrow" href="/servicios">Ver servicios →</a></div>
+        <ul class="svc" role="list">
+          {services.items.slice(0, 3).map((s) => (
+            <li>
+              <a href={`/servicios/${s.slug}`}>
+                <h3>{s.name}</h3>
+                <p>{s.description.slice(0, 120)}{s.description.length > 120 ? '…' : ''}</p>
+                <span class="link-arrow">Conocer más →</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  <section class="band">
+    <div class="container band__in">
+      <h2>Aprende a trabajar el barro</h2>
+      <p>Muy pronto abriremos las inscripciones a nuestros cursos de cerámica. Escríbenos para enterarte primero.</p>
+      <a class="btn" href="/contacto">Quiero que me avisen</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    border-bottom: var(--border-w) solid var(--color-line);
+  }
+  .hero__in {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: var(--space-7);
+    align-items: center;
+    padding-block: var(--space-7);
+  }
+  .hero__text {
+    display: grid;
+    gap: var(--space-4);
+    justify-items: start;
+  }
+  h1 {
+    font-size: var(--text-3xl);
+  }
+  .hero__text p:not(.eyebrow) {
+    font-size: var(--text-lg);
+    max-width: 30rem;
+  }
+  .hero__cta {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  :global(.hero__pic) {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: 8px 8px 0 var(--color-ink);
+  }
+  .strip {
+    border-bottom: var(--border-w) solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .strip ul {
+    display: flex;
+    gap: var(--space-6);
+    padding-block: var(--space-3);
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .strip a {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-decoration: none;
+  }
+  .strip a:hover {
+    text-decoration: underline;
+  }
+  .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    margin-bottom: var(--space-5);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: var(--space-6) var(--space-5);
+  }
+  .svc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-5);
+    padding: 0;
+  }
+  .svc a {
+    display: grid;
+    gap: var(--space-2);
+    height: 100%;
+    padding: var(--space-5);
+    border: var(--border-w) solid var(--color-line);
+    text-decoration: none;
+    transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+  }
+  .svc a:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-hard);
+  }
+  .band {
+    background: var(--color-inverse-bg);
+    color: var(--color-inverse-ink);
+    padding-block: var(--space-7);
+  }
+  .band__in {
+    display: grid;
+    gap: var(--space-4);
+    justify-items: start;
+  }
+  .band .btn {
+    box-shadow: 2px 2px 0 var(--color-inverse-ink);
+  }
+  .band :focus-visible {
+    outline-color: var(--color-inverse-ink);
+  }
+  .muted {
+    color: var(--color-ink-mute);
+  }
+  @media (max-width: 760px) {
+    .hero__in {
+      grid-template-columns: 1fr;
+      gap: var(--space-5);
+    }
+  }
+</style>

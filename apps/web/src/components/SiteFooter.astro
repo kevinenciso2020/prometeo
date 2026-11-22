@@ -1,0 +1,87 @@
+---
+import { whatsappUrl, type Settings } from '../lib/site';
+interface Props {
+  settings: Settings;
+}
+const { settings: s } = Astro.props;
+const wa = whatsappUrl(s.contact.whatsapp);
+const social = [
+  { label: 'Instagram', url: s.social.instagram },
+  { label: 'Facebook', url: s.social.facebook },
+  { label: 'TikTok', url: s.social.tiktok },
+].filter((x) => x.url);
+---
+
+<footer class="foot">
+  <div class="container foot__grid">
+    <div>
+      <p class="foot__logo">Prometeo</p>
+      <p>Taller de cerámica artesanal. Piezas hechas a mano y cursos para aprender el oficio.</p>
+    </div>
+    <div>
+      <h2 class="eyebrow">Contacto</h2>
+      <ul role="list">
+        {s.contact.email && <li><a href={`mailto:${s.contact.email}`}>{s.contact.email}</a></li>}
+        {s.contact.phone && <li><a href={`tel:${s.contact.phone.replace(/\s/g, '')}`}>{s.contact.phone}</a></li>}
+        {wa && <li><a href={wa} rel="noopener" target="_blank">WhatsApp</a></li>}
+        {s.contact.address && <li>{s.contact.address}</li>}
+        {s.contact.hours && <li>{s.contact.hours}</li>}
+      </ul>
+      {social.length > 0 && (
+        <ul role="list" class="foot__social">
+          {social.map((x) => <li><a href={x.url} rel="noopener noreferrer" target="_blank">{x.label}</a></li>)}
+        </ul>
+      )}
+    </div>
+    <div>
+      <h2 class="eyebrow">Información</h2>
+      <ul role="list">
+        <li><a href="/terminos">Términos y condiciones</a></li>
+        <li><a href="/privacidad">Política de privacidad</a></li>
+        <li><a href="/envios-y-devoluciones">Envíos y devoluciones</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="container foot__legal">© {new Date().getFullYear()} Prometeo. Todos los derechos reservados.</div>
+</footer>
+
+<style>
+  .foot {
+    margin-top: var(--space-8);
+    background: var(--color-inverse-bg);
+    color: var(--color-inverse-ink);
+    padding-block: var(--space-7) var(--space-5);
+    font-size: var(--text-sm);
+  }
+  .foot :focus-visible {
+    outline-color: var(--color-inverse-ink);
+  }
+  .foot__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: var(--space-6);
+  }
+  .foot__logo {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    margin-bottom: var(--space-2);
+  }
+  ul {
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+  .foot__social {
+    grid-auto-flow: column;
+    justify-content: start;
+    gap: var(--space-4);
+  }
+  .foot__legal {
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+    border-top: 1px solid rgb(255 255 255 / 0.25);
+    color: rgb(255 255 255 / 0.7);
+    font-size: var(--text-xs);
+  }
+</style>

@@ -1,0 +1,53 @@
+---
+import { cld, srcset } from '../lib/images';
+
+interface Props {
+  src: string | null | undefined;
+  alt: string;
+  sizes?: string;
+  width?: number;
+  ratio?: string;
+  eager?: boolean;
+  class?: string;
+}
+const { src, alt, sizes = '(min-width: 60rem) 25vw, 50vw', width = 640, ratio = '1 / 1', eager = false, class: cls } = Astro.props;
+---
+
+<div class:list={['pic', cls]} style={`aspect-ratio: ${ratio}`}>
+  {
+    src ? (
+      <img
+        src={cld(src, width, 'c_fill')}
+        srcset={srcset(src, 'c_fill') || undefined}
+        sizes={sizes}
+        alt={alt}
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+        fetchpriority={eager ? 'high' : undefined}
+      />
+    ) : (
+      <span class="pic__empty" aria-hidden="true">Prometeo</span>
+    )
+  }
+</div>
+
+<style>
+  .pic {
+    background: var(--color-surface);
+    overflow: hidden;
+    width: 100%;
+  }
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pic__empty {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    color: var(--color-ink-mute);
+  }
+</style>
