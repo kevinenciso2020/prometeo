@@ -1,11 +1,12 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { products, services, type Db } from '@prometeo/db';
-import { computeShipping, type CartLine } from '@prometeo/shared';
+import type { CartLine, PricingLine, ShippingConfig } from '@prometeo/shared';
 import type { LoadedSettings } from './settings';
 
 export interface PricedLine {
   type: 'product' | 'service';
   id: string;
+  categoryId?: string | null;
   name?: string;
   slug?: string;
   image?: string | null;
@@ -40,6 +41,7 @@ export async function priceCart(db: Db, items: CartLine[]): Promise<PricedLine[]
           price: products.price,
           stock: products.stock,
           isUnique: products.isUnique,
+          categoryId: products.categoryId,
           image: PRODUCT_IMG,
         })
         .from(products)
@@ -54,6 +56,7 @@ export async function priceCart(db: Db, items: CartLine[]): Promise<PricedLine[]
       lines.push({
         type: it.type,
         id: p.id,
+        categoryId: p.categoryId,
         name: p.name,
         slug: p.slug,
         image: p.image,
@@ -104,16 +107,23 @@ export async function priceCart(db: Db, items: CartLine[]): Promise<PricedLine[]
   return lines;
 }
 
-export function summarizeCart(lines: PricedLine[], settings: LoadedSettings) {
-  const ok = lines.filter((l) => l.available);
-  const subtotal = ok.reduce((sum, l) => sum + (l.lineTotal ?? 0), 0);
-  const hasShippable = ok.some((l) => l.type === 'product');
-  const shipping = computeShipping({
-    subtotal,
-    hasShippableItems: hasShippable,
+/** Líneas disponibles convertidas para el motor de precios. */
+export function toPricingLines(lines: PricedLine[]): PricingLine[] {
+  return lines
+    .filter((l) => l.available)
+    .map((l) => ({
+      kind: l.type,
+      id: l.id,
+      categoryId: l.categoryId ?? null,
+      unitPrice: l.unitPrice ?? 0,
+      quantity: l.quantity ?? 1,
+    }));
+}
+
+export function shippingConfig(settings: LoadedSettings): ShippingConfig {
+  return {
     flatRate: Number(settings.shipping_flat_rate),
     freeThreshold:
       settings.free_shipping_threshold === null ? null : Number(settings.free_shipping_threshold),
-  });
-  return { subtotal, shipping, total: subtotal + shipping, hasShippable };
+  };
 }

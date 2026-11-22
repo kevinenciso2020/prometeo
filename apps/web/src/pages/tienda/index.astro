@@ -3,7 +3,10 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import Pagination from '../../components/Pagination.astro';
 import { apiGet, type CategoryData, type Paged, type ProductCardData } from '../../lib/site';
+import CampaignBanner from '../../components/CampaignBanner.astro';
+import { byPlacement, pageCampaigns } from '../../lib/campaigns';
 
+const banners = byPlacement(await pageCampaigns(Astro.locals, Astro.url.pathname), 'banner_seccion');
 const sp = Astro.url.searchParams;
 const q = sp.get('q') ?? '';
 const category = sp.get('category') ?? '';
@@ -33,6 +36,7 @@ const hasFilters = Boolean(q || category || minPrice || maxPrice);
   description={activeCat?.description ?? 'Cerámica artesanal hecha a mano: tazas, platos, jarrones y más piezas únicas.'}
   noindex={Boolean(q || minPrice || maxPrice || page > 1)}
 >
+  {banners.map((b) => <CampaignBanner campaign={b} />)}
   <div class="container section">
     <h1>{title}</h1>
 

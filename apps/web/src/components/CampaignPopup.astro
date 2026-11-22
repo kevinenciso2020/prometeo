@@ -1,0 +1,119 @@
+---
+import { cld } from '../lib/images';
+import type { PublicCampaign } from '../lib/campaigns';
+interface Props {
+  campaign: PublicCampaign;
+}
+const { campaign: c } = Astro.props;
+const external = c.ctaUrl?.startsWith('https://') ?? false;
+---
+
+<dialog id="campaign-popup" aria-labelledby="popup-title" data-campaign-id={c.id} data-freq={c.popupFrequencyHours}>
+  <button type="button" class="x" id="popup-close" aria-label="Cerrar">✕</button>
+  {c.imageDesktop && <img src={cld(c.imageMobile ?? c.imageDesktop, 640, 'c_fill,ar_16:9')} alt="" loading="lazy" width="640" height="360" />}
+  <div class="in">
+    <h2 id="popup-title">{c.title ?? 'Promoción'}</h2>
+    {c.text && <p>{c.text}</p>}
+    {c.couponCode && <p class="code">Código: <strong>{c.couponCode}</strong></p>}
+    <div class="actions">
+      {
+        c.ctaText && c.ctaUrl && (
+          <a class="btn btn--primary" href={c.ctaUrl} data-campaign-cta={c.id} rel={external ? 'noopener noreferrer' : undefined} target={external ? '_blank' : undefined}>{c.ctaText}</a>
+        )
+      }
+      <button type="button" class="btn btn--sm" id="popup-never">No volver a mostrar</button>
+    </div>
+  </div>
+</dialog>
+
+<style>
+  dialog {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: 0;
+    width: min(30rem, calc(100vw - 2rem));
+    background: var(--color-bg);
+    overflow: hidden;
+  }
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.55);
+  }
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .in {
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-3);
+  }
+  h2 {
+    font-size: var(--text-xl);
+  }
+  .code {
+    border: var(--border-w) dashed var(--color-line);
+    padding: var(--space-1) var(--space-3);
+    justify-self: start;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+  }
+  .x {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    z-index: 1;
+    width: 2.25rem;
+    height: 2.25rem;
+    background: var(--color-bg);
+    border: var(--border-w) solid var(--color-line);
+  }
+</style>
+
+<script>
+  import { trackImpressionOnce } from '../lib/track';
+
+  const dlg = document.getElementById('campaign-popup') as HTMLDialogElement | null;
+  if (dlg && typeof dlg.showModal === 'function') {
+    const id = dlg.dataset.campaignId ?? '';
+    const freqMs = Number(dlg.dataset.freq ?? 24) * 3_600_000;
+    const key = `prometeo_popup_${id}`;
+    type State = { never?: boolean; last?: number };
+    const read = (): State => {
+      try {
+        return JSON.parse(localStorage.getItem(key) ?? '{}') as State;
+      } catch {
+        return {};
+      }
+    };
+    const write = (s: State) => {
+      try {
+        localStorage.setItem(key, JSON.stringify(s));
+      } catch {
+        /* sin almacenamiento */
+      }
+    };
+    const state = read();
+    // "No mostrar de nuevo" y frecuencia configurable por campaña.
+    if (!state.never && Date.now() - (state.last ?? 0) >= freqMs) {
+      setTimeout(() => {
+        if (document.querySelector('dialog[open]')) return; // no apilar sobre otro diálogo
+        dlg.showModal();
+        write({ ...read(), last: Date.now() });
+        trackImpressionOnce(id);
+      }, 4000);
+    }
+    document.getElementById('popup-close')?.addEventListener('click', () => dlg.close());
+    document.getElementById('popup-never')?.addEventListener('click', () => {
+      write({ ...read(), never: true });
+      dlg.close();
+    });
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg) dlg.close(); // clic en el fondo
+    });
+  }
+</script>

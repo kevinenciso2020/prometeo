@@ -26,6 +26,7 @@ export interface Bindings {
   RL_AUTH?: RateLimit;
   RL_PUBLIC?: RateLimit;
   RL_WEBHOOK?: RateLimit;
+  RL_TRACK?: RateLimit;
 }
 
 export interface AuthUser {

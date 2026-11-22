@@ -10,6 +10,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { coupons } from './coupons';
 import { users } from './users';
 import {
   contentStatusEnum,
@@ -121,6 +122,9 @@ export const enrollments = pgTable(
     status: enrollmentStatusEnum('status').notNull().default('lista'),
     paymentMode: paymentModeEnum('payment_mode').notNull(),
     totalAmount: integer('total_amount').notNull(),
+    /** Cupón aplicado al inscribirse y descuento ya restado de total_amount. */
+    couponId: uuid('coupon_id').references(() => coupons.id, { onDelete: 'set null' }),
+    discountAmount: integer('discount_amount').notNull().default(0),
     paidAmount: integer('paid_amount').notNull().default(0),
     reservedUntil: tstz('reserved_until'),
     balanceDueAt: tstz('balance_due_at'),

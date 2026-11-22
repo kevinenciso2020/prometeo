@@ -1,0 +1,124 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Cupón" active="cupones">
+  <div class="page-head">
+    <h1 id="title">Cupón</h1>
+    <div class="actions"><a class="btn" href="/admin/cupones">Volver</a><button class="btn btn--danger" id="delete" type="button" hidden>Eliminar</button></div>
+  </div>
+  <p class="hint" id="uses" style="margin-bottom: var(--space-4)"></p>
+  <form id="form" class="stack" data-id={id} novalidate>
+    <div class="card stack">
+      <label class="check"><input type="checkbox" name="isAutomatic" id="isAutomatic" /> Descuento automático (sin código: se aplica solo)</label>
+      <div class="grid-2">
+        <div class="field" id="code-field"><label for="code">Código</label><input class="input" id="code" name="code" autocapitalize="characters" placeholder="TAZAS20" /><span class="hint">Letras, números, guion. No distingue mayúsculas.</span></div>
+        <div class="field"><label for="type">Tipo</label>
+          <select class="select" id="type" name="type"><option value="porcentaje">Porcentaje (%)</option><option value="monto_fijo">Monto fijo (COP)</option><option value="envio_gratis">Envío gratis</option></select></div>
+        <div class="field" id="value-field"><label for="value" id="value-label">Valor</label><input class="input" id="value" name="value" type="number" min="0" step="1" value="10" /></div>
+        <div class="field"><label for="minPurchase">Compra mínima (COP)</label><input class="input" id="minPurchase" name="minPurchase" type="number" min="0" step="1" value="0" /><span class="hint">Se mide sobre los ítems a los que aplica el cupón.</span></div>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Aplica a</h2>
+      <div class="field"><label for="appliesTo">Alcance</label>
+        <select class="select" id="appliesTo" name="appliesTo"><option value="todo">Todo</option><option value="productos">Solo productos</option><option value="cursos">Solo cursos</option><option value="categorias">Categorías específicas</option><option value="items">Ítems específicos</option></select></div>
+      <fieldset id="targets" hidden style="border:0;padding:0;margin:0"><legend class="sr-only">Elementos</legend><div id="target-list" class="stack" style="max-height:16rem;overflow:auto;border:var(--border-w) solid var(--color-line);padding:var(--space-3)"></div></fieldset>
+    </div>
+    <div class="card stack">
+      <h2>Vigencia y límites</h2>
+      <div class="grid-2">
+        <div class="field"><label for="startsAt">Inicio</label><input class="input" id="startsAt" name="startsAt" type="datetime-local" /><span class="hint">Hora de Colombia. Vacío = ya vigente.</span></div>
+        <div class="field"><label for="endsAt">Fin</label><input class="input" id="endsAt" name="endsAt" type="datetime-local" /></div>
+        <div class="field"><label for="maxUses">Usos máximos totales</label><input class="input" id="maxUses" name="maxUses" type="number" min="1" /></div>
+        <div class="field"><label for="maxUsesPerEmail">Usos máximos por correo</label><input class="input" id="maxUsesPerEmail" name="maxUsesPerEmail" type="number" min="1" /></div>
+      </div>
+      <div class="field"><label for="description">Descripción interna</label><input class="input" id="description" name="description" /></div>
+      <label class="check"><input type="checkbox" name="isActive" checked /> Activo</label>
+    </div>
+    <p class="form-error" id="error" role="alert"></p>
+    <div><button class="btn btn--primary" type="submit">Guardar cupón</button></div>
+  </form>
+
+  <script>
+    import { $, api, errorMessage, fillForm, readForm, toBogotaIso, toBogotaLocal, toast } from '../../../lib/admin-client';
+    const form = $<HTMLFormElement>('#form');
+    const error = $('#error');
+    const id = form.dataset.id && form.dataset.id !== 'nuevo' ? form.dataset.id : null;
+    let selected = new Set<string>();
+
+    function sync() {
+      const auto = $<HTMLInputElement>('#isAutomatic').checked;
+      $('#code-field').hidden = auto;
+      const type = $<HTMLSelectElement>('#type').value;
+      $('#value-field').hidden = type === 'envio_gratis';
+      $('#value-label').textContent = type === 'porcentaje' ? 'Porcentaje (1-100)' : 'Monto (COP)';
+    }
+    ['isAutomatic', 'type'].forEach((k) => $(`#${k}`).addEventListener('change', sync));
+
+    interface Opt { id: string; label: string }
+    async function loadTargets() {
+      const scope = $<HTMLSelectElement>('#appliesTo').value;
+      const box = $('#targets');
+      box.hidden = scope !== 'categorias' && scope !== 'items';
+      if (box.hidden) return;
+      let opts: Opt[] = [];
+      if (scope === 'categorias') opts = (await api<{ items: { id: string; name: string }[] }>('/admin/categories')).items.map((x) => ({ id: x.id, label: x.name }));
+      else {
+        const [p, s, c] = await Promise.all([
+          api<{ items: { id: string; name: string }[] }>('/admin/products?pageSize=100'),
+          api<{ items: { id: string; name: string }[] }>('/admin/services?pageSize=100'),
+          api<{ items: { id: string; name: string }[] }>('/admin/courses?pageSize=100'),
+        ]);
+        opts = [...p.items.map((x) => ({ id: x.id, label: `Producto · ${x.name}` })), ...s.items.map((x) => ({ id: x.id, label: `Servicio · ${x.name}` })), ...c.items.map((x) => ({ id: x.id, label: `Curso · ${x.name}` }))];
+      }
+      $('#target-list').replaceChildren(...opts.map((o) => {
+        const l = document.createElement('label');
+        l.className = 'check';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = o.id;
+        cb.checked = selected.has(o.id);
+        cb.addEventListener('change', () => (cb.checked ? selected.add(o.id) : selected.delete(o.id)));
+        l.append(cb, ' ' + o.label);
+        return l;
+      }));
+    }
+    $('#appliesTo').addEventListener('change', () => void loadTargets());
+
+    async function init() {
+      if (!id) { $('#title').textContent = 'Nuevo cupón'; sync(); return; }
+      const { item } = await api<{ item: Record<string, unknown> & { uses: number; targetIds: string[]; startsAt: string | null; endsAt: string | null; code: string | null } }>(`/admin/coupons/${id}`);
+      $('#title').textContent = item.code ?? 'Descuento automático';
+      $('#uses').textContent = `Usos aprobados: ${item.uses}`;
+      selected = new Set(item.targetIds);
+      fillForm(form, { ...item, startsAt: item.startsAt ? toBogotaLocal(item.startsAt) : '', endsAt: item.endsAt ? toBogotaLocal(item.endsAt) : '' });
+      sync();
+      await loadTargets();
+      $<HTMLButtonElement>('#delete').hidden = false;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      const v = readForm(form);
+      const auto = Boolean(v.isAutomatic);
+      const body = {
+        code: auto ? null : v.code, type: v.type, value: v.type === 'envio_gratis' ? 0 : (v.value ?? 0), appliesTo: v.appliesTo, targetIds: [...selected],
+        minPurchase: v.minPurchase ?? 0, startsAt: v.startsAt ? toBogotaIso(String(v.startsAt)) : null, endsAt: v.endsAt ? toBogotaIso(String(v.endsAt)) : null,
+        maxUses: v.maxUses, maxUsesPerEmail: v.maxUsesPerEmail, isAutomatic: auto, isActive: v.isActive, description: v.description,
+      };
+      try {
+        const r = id ? await api<{ item: { id: string } }>(`/admin/coupons/${id}`, 'PUT', body) : await api<{ item: { id: string } }>('/admin/coupons', 'POST', body);
+        toast('Cupón guardado');
+        if (!id) location.href = `/admin/cupones/${r.item.id}`;
+      } catch (err) { error.textContent = errorMessage(err); }
+    });
+    $('#delete').addEventListener('click', async () => {
+      if (!id || !confirm('¿Eliminar este cupón?')) return;
+      try { await api(`/admin/coupons/${id}`, 'DELETE'); location.href = '/admin/cupones'; } catch (err) { toast(errorMessage(err), 'error'); }
+    });
+    void init().catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

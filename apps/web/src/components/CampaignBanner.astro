@@ -1,0 +1,104 @@
+---
+import { cld } from '../lib/images';
+import type { PublicCampaign } from '../lib/campaigns';
+
+interface Props {
+  campaign: PublicCampaign;
+  hero?: boolean;
+}
+const { campaign: c, hero = false } = Astro.props;
+const desktop = c.imageDesktop;
+const mobile = c.imageMobile ?? c.imageDesktop;
+const external = c.ctaUrl?.startsWith('https://') ?? false;
+---
+
+<section class:list={['cb', { 'cb--hero': hero, 'cb--img': Boolean(desktop) }]} data-campaign-id={c.id} data-track="view" aria-label={c.title ?? 'Promoción'}>
+  {
+    desktop && (
+      <picture class="cb__pic">
+        {mobile && <source media="(max-width: 640px)" srcset={`${cld(mobile, 480, 'c_fill,ar_4:5')} 480w, ${cld(mobile, 800, 'c_fill,ar_4:5')} 800w`} sizes="100vw" />}
+        <img
+          src={cld(desktop, 1400, 'c_fill,ar_21:9')}
+          srcset={`${cld(desktop, 800, 'c_fill,ar_21:9')} 800w, ${cld(desktop, 1400, 'c_fill,ar_21:9')} 1400w, ${cld(desktop, 2000, 'c_fill,ar_21:9')} 2000w`}
+          sizes="100vw"
+          alt=""
+          loading={hero ? 'eager' : 'lazy'}
+          decoding="async"
+          fetchpriority={hero ? 'high' : undefined}
+        />
+      </picture>
+    )
+  }
+  <div class="cb__body container">
+    {c.title && <h2>{c.title}</h2>}
+    {c.text && <p>{c.text}</p>}
+    {c.couponCode && <p class="cb__code">Código: <strong>{c.couponCode}</strong></p>}
+    {
+      c.ctaText && c.ctaUrl && (
+        <a class="btn btn--primary" href={c.ctaUrl} data-campaign-cta={c.id} rel={external ? 'noopener noreferrer' : undefined} target={external ? '_blank' : undefined}>
+          {c.ctaText}
+        </a>
+      )
+    }
+  </div>
+</section>
+
+<style>
+  .cb {
+    position: relative;
+    border-bottom: var(--border-w) solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .cb__pic,
+  .cb__pic img {
+    display: block;
+    width: 100%;
+  }
+  .cb__pic img {
+    height: auto;
+    max-height: 32rem;
+    object-fit: cover;
+  }
+  .cb__body {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+    padding-block: var(--space-6);
+  }
+  .cb--img .cb__body {
+    position: absolute;
+    inset: 0;
+    align-content: center;
+    padding-block: 0;
+    color: var(--color-inverse-ink);
+    background: linear-gradient(90deg, rgb(0 0 0 / 0.65), rgb(0 0 0 / 0));
+  }
+  .cb--img .cb__body :global(.btn) {
+    box-shadow: 2px 2px 0 var(--color-inverse-ink);
+  }
+  h2 {
+    font-size: var(--text-2xl);
+    max-width: 30rem;
+  }
+  .cb--hero h2 {
+    font-size: var(--text-3xl);
+  }
+  p {
+    max-width: 32rem;
+  }
+  .cb__code {
+    border: var(--border-w) dashed currentColor;
+    padding: var(--space-1) var(--space-3);
+  }
+  @media (max-width: 640px) {
+    .cb--img .cb__body {
+      position: static;
+      color: var(--color-ink);
+      background: none;
+      padding-block: var(--space-4);
+    }
+    .cb--img .cb__body :global(.btn) {
+      box-shadow: var(--shadow-hard-sm);
+    }
+  }
+</style>

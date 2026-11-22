@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { couponInputSchema } from './marketing';
 
 export const publicProductsQuerySchema = z
   .object({
@@ -23,7 +24,10 @@ export const cartLineSchema = z.object({
   id: z.uuid(),
   quantity: z.number().int().min(1).max(20),
 });
-export const cartQuoteSchema = z.object({ items: z.array(cartLineSchema).min(1).max(30) });
+export const cartQuoteSchema = z.object({
+  items: z.array(cartLineSchema).min(1).max(30),
+  couponCode: couponInputSchema,
+});
 export type CartLine = z.infer<typeof cartLineSchema>;
 
 export const quoteRequestSchema = z.object({

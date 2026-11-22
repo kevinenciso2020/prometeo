@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isValidLocation } from '../divipola';
 import { ORDER_STATUSES } from '../orders';
+import { couponInputSchema } from './marketing';
 import { cartLineSchema } from './public';
 
 const contact = {
@@ -46,6 +47,7 @@ export const checkoutOrderSchema = z.object({
   items: z.array(cartLineSchema).min(1, 'Tu carrito está vacío').max(30),
   ...contact,
   shipping: shippingAddressSchema.nullish().transform((v) => v ?? null),
+  couponCode: couponInputSchema,
   acceptDataPolicy: z.literal(true, {
     error: 'Debes autorizar el tratamiento de tus datos personales',
   }),

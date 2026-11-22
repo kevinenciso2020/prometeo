@@ -49,9 +49,11 @@ import { DEPARTMENTS } from '@prometeo/shared';
         <ul id="lines" role="list"></ul>
         <dl>
           <dt>Subtotal</dt><dd id="subtotal"></dd>
+          <dt id="discount-label" hidden>Descuento</dt><dd id="discount" hidden></dd>
           <dt>Envío</dt><dd id="shippingCost"></dd>
           <dt class="total">Total</dt><dd class="total" id="total"></dd>
         </dl>
+        <p class="hint" id="coupon-note" role="status"></p>
         <a href="/carrito" class="link-arrow">← Editar carrito</a>
       </aside>
     </div>
@@ -61,9 +63,10 @@ import { DEPARTMENTS } from '@prometeo/shared';
     import { formatCop, getMunicipalities } from '@prometeo/shared';
     import { API_URL } from '../lib/site';
     import { clearCart, readCart } from '../lib/cart';
+    import { couponText, getCoupon, type CouponInfo } from '../lib/coupon';
 
     interface Line { type: 'product' | 'service'; id: string; name?: string; quantity?: number; available: boolean; lineTotal?: number; reason?: string | null }
-    interface Quote { lines: Line[]; subtotal: number; shipping: number; total: number }
+    interface Quote { lines: Line[]; subtotal: number; itemDiscount: number; shipping: number; total: number; coupon: CouponInfo }
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     const form = $<HTMLFormElement>('form');
@@ -85,7 +88,7 @@ import { DEPARTMENTS } from '@prometeo/shared';
         return;
       }
       try {
-        const res = await fetch(`${API_URL}/public/cart/quote`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+        const res = await fetch(`${API_URL}/public/cart/quote`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items, couponCode: getCoupon() }) });
         if (!res.ok) throw new Error('quote');
         const q = (await res.json()) as Quote;
         const bad = q.lines.filter((l) => !l.available);
@@ -111,6 +114,12 @@ import { DEPARTMENTS } from '@prometeo/shared';
         $('subtotal').textContent = formatCop(q.subtotal);
         $('shippingCost').textContent = hasProducts ? (q.shipping === 0 ? 'Gratis' : formatCop(q.shipping)) : 'No aplica';
         $('total').textContent = formatCop(q.total);
+        const has = q.itemDiscount > 0;
+        $('discount-label').hidden = !has;
+        $('discount').hidden = !has;
+        $('discount').textContent = has ? `−${formatCop(q.itemDiscount)}` : '';
+        const info = couponText(q.coupon);
+        $('coupon-note').textContent = info.text;
         $('state').hidden = true;
         $('wrap').hidden = false;
       } catch {
@@ -131,6 +140,7 @@ import { DEPARTMENTS } from '@prometeo/shared';
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             items,
+            couponCode: getCoupon(),
             name: String(d.get('name') ?? ''),
             email: String(d.get('email') ?? ''),
             phone: String(d.get('phone') ?? ''),

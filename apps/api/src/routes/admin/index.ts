@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../../env';
 import { requireRole } from '../../middleware/auth';
+import { campaignsRoutes } from './campaigns';
 import { categoriesRoutes } from './categories';
+import { couponsRoutes } from './coupons';
 import { coursesRoutes } from './courses';
 import { editionsRoutes } from './editions';
 import { enrollmentsRoutes } from './enrollments';
@@ -24,6 +26,8 @@ adminRoutes.route('/uploads', uploadsRoutes);
 adminRoutes.route('/categories', categoriesRoutes);
 adminRoutes.route('/products', productsRoutes);
 adminRoutes.route('/services', servicesRoutes);
+adminRoutes.route('/campaigns', campaignsRoutes);
+adminRoutes.route('/coupons', couponsRoutes);
 adminRoutes.route('/courses', coursesRoutes);
 adminRoutes.route('/editions', editionsRoutes);
 adminRoutes.route('/enrollments', enrollmentsRoutes);

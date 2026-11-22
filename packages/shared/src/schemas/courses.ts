@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PAYMENT_MODES } from '../enrollment';
 import { CONTENT_STATUSES, imagesSchema, slugSchema } from './catalog';
+import { couponInputSchema } from './marketing';
 
 const cop = z.number().int('Debe ser un entero en pesos').min(0).max(2_000_000_000);
 const text = (max: number) =>
@@ -107,6 +108,7 @@ const contact = {
 export const createEnrollmentSchema = z.object({
   editionId: z.uuid(),
   mode: z.enum(PAYMENT_MODES),
+  couponCode: couponInputSchema,
   ...contact,
   acceptDataPolicy: z.literal(true, {
     error: 'Debes autorizar el tratamiento de tus datos personales',

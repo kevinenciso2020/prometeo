@@ -12,9 +12,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <h2>Resumen</h2>
         <dl>
           <dt>Subtotal</dt><dd id="subtotal"></dd>
+          <dt id="discount-label" hidden>Descuento</dt><dd id="discount" hidden></dd>
           <dt>Envío</dt><dd id="shipping"></dd>
           <dt class="total">Total</dt><dd class="total" id="total"></dd>
         </dl>
+        <form class="coupon" id="coupon-form">
+          <label for="coupon">¿Tienes un cupón?</label>
+          <div class="coupon__row"><input class="input" id="coupon" name="coupon" autocomplete="off" maxlength="40" /><button class="btn btn--sm" type="submit">Aplicar</button></div>
+          <p class="coupon__msg" id="coupon-msg" role="status"></p>
+        </form>
         <p class="hint" id="free-hint"></p>
         <a class="btn btn--primary" href="/checkout" id="checkout">Finalizar compra</a>
         <p class="hint">Pagas de forma segura con Wompi: tarjetas, PSE y Nequi.</p>
@@ -29,6 +35,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     import { cld } from '../lib/images';
     import { readCart, removeFromCart, setQuantity } from '../lib/cart';
     import { clearCart } from '../lib/cart';
+    import { couponText, getCoupon, setCoupon, type CouponInfo } from '../lib/coupon';
 
     interface Line {
       type: 'product' | 'service';
@@ -44,6 +51,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       reason?: string | null;
     }
     interface Quote {
+      itemDiscount: number;
+      coupon: CouponInfo;
       lines: Line[];
       subtotal: number;
       shipping: number;
@@ -126,7 +135,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         const res = await fetch(`${API_URL}/public/cart/quote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
+          body: JSON.stringify({ items, couponCode: getCoupon() }),
         });
         if (!res.ok) throw new Error('quote');
         const q = (await res.json()) as Quote;
@@ -134,6 +143,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         set('subtotal', formatCop(q.subtotal));
         set('shipping', q.shipping === 0 ? (q.subtotal > 0 ? 'Gratis' : '—') : formatCop(q.shipping));
         set('total', formatCop(q.total));
+        renderCoupon(q);
         const missing = q.freeShippingThreshold !== null && q.shipping > 0 ? q.freeShippingThreshold - q.subtotal : 0;
         set('free-hint', missing > 0 ? `Te faltan ${formatCop(missing)} para tener envío gratis.` : '');
         state.hidden = true;
@@ -144,6 +154,26 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         state.textContent = 'No pudimos actualizar tu carrito. Intenta de nuevo en unos minutos.';
       }
     }
+
+    function renderCoupon(q: Quote) {
+      const has = q.itemDiscount > 0;
+      (document.getElementById('discount-label') as HTMLElement).hidden = !has;
+      const d = document.getElementById('discount') as HTMLElement;
+      d.hidden = !has;
+      d.textContent = has ? `−${formatCop(q.itemDiscount)}` : '';
+      const info = couponText(q.coupon);
+      const msg = document.getElementById('coupon-msg') as HTMLElement;
+      msg.textContent = info.text;
+      msg.dataset.tone = info.tone;
+      // Un código inválido se descarta para no arrastrarlo al checkout.
+      if (q.coupon.status === 'rejected') setCoupon(null);
+      (document.getElementById('coupon') as HTMLInputElement).value = q.coupon.applied && !q.coupon.applied.isAutomatic ? (q.coupon.applied.code ?? '') : (getCoupon() ?? '');
+    }
+    document.getElementById('coupon-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      setCoupon((document.getElementById('coupon') as HTMLInputElement).value || null);
+      void load();
+    });
 
     document.getElementById('clear')?.addEventListener('click', () => {
       clearCart();
@@ -248,6 +278,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     font-size: var(--text-lg);
     border-top: 1px solid var(--color-line);
     padding-top: var(--space-2);
+  }
+  .coupon {
+    display: grid;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+  }
+  .coupon__row {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .coupon__msg {
+    font-weight: 600;
+    min-height: 1.2em;
+  }
+  .coupon__msg[data-tone='ok'] {
+    color: var(--color-success);
+  }
+  .coupon__msg[data-tone='error'] {
+    color: var(--color-danger);
   }
   .hint {
     font-size: var(--text-xs);

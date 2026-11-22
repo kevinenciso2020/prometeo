@@ -12,3 +12,5 @@ export * from './divipola';
 export * from './wompi';
 export * from './orders';
 export * from './schemas/checkout';
+export * from './pricing';
+export * from './schemas/marketing';

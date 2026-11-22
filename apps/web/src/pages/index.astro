@@ -4,6 +4,8 @@ import Picture from '../components/Picture.astro';
 import ProductCard from '../components/ProductCard.astro';
 import { apiGet, fmtDay, SITE_URL, type CategoryData, type CourseListItem, type Paged, type ProductCardData, type ServiceData } from '../lib/site';
 import { ogImage } from '../lib/images';
+import CampaignBanner from '../components/CampaignBanner.astro';
+import { byPlacement, pageCampaigns } from '../lib/campaigns';
 
 const [featured, categories, services, courses] = await Promise.all([
   apiGet<Paged<ProductCardData>>('/public/products?featured=true&pageSize=4'),
@@ -12,6 +14,9 @@ const [featured, categories, services, courses] = await Promise.all([
   apiGet<{ items: CourseListItem[] }>('/public/courses'),
 ]);
 const upcoming = (courses?.items ?? []).filter((c) => c.nextEdition).slice(0, 3);
+const campaigns = await pageCampaigns(Astro.locals, Astro.url.pathname);
+const heroCampaign = byPlacement(campaigns, 'hero_banner')[0];
+const sectionBanners = byPlacement(campaigns, 'banner_seccion');
 const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
 ---
 
@@ -20,6 +25,7 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
   image={ogImage(heroImage)}
   structuredData={{ '@context': 'https://schema.org', '@type': 'Organization', name: 'Prometeo', url: SITE_URL }}
 >
+  {heroCampaign && <CampaignBanner campaign={heroCampaign} hero />}
   <section class="hero">
     <div class="container hero__in">
       <div class="hero__text">
@@ -44,6 +50,8 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
       </section>
     )
   }
+
+  {sectionBanners.map((b) => <CampaignBanner campaign={b} />)}
 
   <section class="section container">
     <div class="head"><h2>Destacados</h2><a class="link-arrow" href="/tienda">Ver todo →</a></div>

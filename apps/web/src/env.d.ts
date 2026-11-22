@@ -8,6 +8,8 @@ declare namespace App {
       name: string;
       role: 'CLIENTE' | 'ADMIN' | 'SUPER_ADMIN';
     };
+    /** Memo por request de las campañas activas (ver lib/campaigns.ts). */
+    campaigns?: Promise<unknown[]>;
   }
 }
 

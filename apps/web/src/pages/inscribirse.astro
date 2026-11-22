@@ -45,6 +45,7 @@ const info: Record<string, { title: string; text: string }> = {
           <div class="field"><label for="phone">Teléfono / WhatsApp</label><input class="input" id="phone" name="phone" type="tel" autocomplete="tel" required /></div>
           <div class="field"><label for="document">Documento (opcional)</label><input class="input" id="document" name="document" /></div>
         </div>
+        <div class="field"><label for="couponCode">Cupón de descuento (opcional)</label><input class="input" id="couponCode" name="couponCode" autocomplete="off" maxlength="40" /></div>
         <div class="hp" aria-hidden="true"><label>Sitio web<input name="website" tabindex="-1" autocomplete="off" /></label></div>
         <label class="check">
           <input type="checkbox" name="acceptDataPolicy" required />
@@ -83,6 +84,7 @@ const info: Record<string, { title: string; text: string }> = {
           body: JSON.stringify({
             editionId: form.dataset.edition,
             mode: String(d.get('mode') ?? ''),
+            couponCode: String(d.get('couponCode') ?? '').trim() || null,
             name: String(d.get('name') ?? ''),
             email: String(d.get('email') ?? ''),
             phone: String(d.get('phone') ?? ''),

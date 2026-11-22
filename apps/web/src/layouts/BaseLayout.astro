@@ -2,6 +2,9 @@
 import '../styles/global.css';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
+import CampaignBar from '../components/CampaignBar.astro';
+import CampaignPopup from '../components/CampaignPopup.astro';
+import { byPlacement, pageCampaigns } from '../lib/campaigns';
 import { SITE_NAME, SITE_TAGLINE, SITE_URL, getSettings, jsonLd } from '../lib/site';
 
 interface Props {
@@ -27,6 +30,10 @@ const {
   cacheable = true,
 } = Astro.props;
 const settings = await getSettings();
+// Barra superior y popup solo en páginas públicas cacheables (no en carrito, checkout ni cuenta).
+const campaigns = cacheable ? await pageCampaigns(Astro.locals, Astro.url.pathname) : [];
+const bar = byPlacement(campaigns, 'barra_superior')[0];
+const popup = byPlacement(campaigns, 'popup')[0];
 const fullTitle = title ? `${title} · ${SITE_NAME}` : `${SITE_NAME} · ${SITE_TAGLINE}`;
 const canonical = `${SITE_URL}${Astro.url.pathname}`;
 const ld = structuredData ? (Array.isArray(structuredData) ? structuredData : [structuredData]) : [];
@@ -65,10 +72,16 @@ if (cacheable) {
   </head>
   <body>
     <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    {bar && <CampaignBar campaign={bar} />}
     <SiteHeader current={nav} />
     <main id="contenido">
       <slot />
     </main>
     <SiteFooter settings={settings} />
+    {popup && <CampaignPopup campaign={popup} />}
+    <script>
+      import { initCampaignTracking } from '../lib/track';
+      initCampaignTracking();
+    </script>
   </body>
 </html>

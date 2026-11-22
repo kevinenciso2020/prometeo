@@ -1,5 +1,13 @@
 import { and, eq, inArray, lte, sql } from 'drizzle-orm';
-import { courseEditions, editionSessions, enrollments, orders, type Db } from '@prometeo/db';
+import {
+  campaigns,
+  coupons,
+  courseEditions,
+  editionSessions,
+  enrollments,
+  orders,
+  type Db,
+} from '@prometeo/db';
 import type { Mailer } from '../lib/mailer';
 import { tomorrowRangeBogota } from '../lib/dates';
 import * as mail from '../lib/enrollment-emails';
@@ -189,6 +197,26 @@ export async function finalizeEditions(db: Db, now = new Date()): Promise<number
   return Array.isArray(rows) ? rows.length : 0;
 }
 
+/** Diario: desactiva campañas y cupones cuya vigencia ya terminó. Idempotente. */
+export async function deactivateExpiredMarketing(
+  db: Db,
+  now = new Date(),
+): Promise<{ campaigns: number; coupons: number }> {
+  const c = await db
+    .update(campaigns)
+    .set({ isActive: false })
+    .where(and(eq(campaigns.isActive, true), lte(campaigns.endsAt, now)))
+    .returning({ id: campaigns.id });
+  const k = await db
+    .update(coupons)
+    .set({ isActive: false })
+    .where(
+      and(eq(coupons.isActive, true), sql`${coupons.endsAt} is not null`, lte(coupons.endsAt, now)),
+    )
+    .returning({ id: coupons.id });
+  return { campaigns: c.length, coupons: k.length };
+}
+
 /** Diario: cancela pedidos sin pago aprobado tras N días (por defecto 7). Idempotente. */
 export async function cancelStaleOrders(db: Db, now = new Date(), days = 7): Promise<number> {
   const cutoff = new Date(now.getTime() - days * 24 * HOUR);
@@ -283,6 +311,8 @@ export async function runCron(cron: string, deps: CronDeps, now = new Date()): P
       try {
         log(`[cron] ediciones finalizadas=${await finalizeEditions(h.db, now)}`);
         log(`[cron] pedidos sin pago cancelados=${await cancelStaleOrders(h.db, now)}`);
+        const off = await deactivateExpiredMarketing(h.db, now);
+        log(`[cron] campañas desactivadas=${off.campaigns} cupones desactivados=${off.coupons}`);
       } finally {
         await h.close();
       }

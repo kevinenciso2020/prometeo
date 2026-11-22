@@ -27,6 +27,7 @@ import * as mail from '../lib/enrollment-emails';
 import type { Mailer } from '../lib/mailer';
 import { withTransaction, type PoolOpener } from '../lib/tx';
 import { AuthError } from './auth.service';
+import { assertCodeAccepted, recordRedemption, resolveDiscount } from './discounts';
 import { issueGuestLink, resolveGuestLink } from './guest-links';
 
 type Enrollment = typeof enrollments.$inferSelect;
@@ -180,18 +181,31 @@ export async function createEnrollment(
       throw err(409, 'EDITION_FULL', 'No quedan cupos. Puedes unirte a la lista de espera');
     }
 
+    // Descuento (cupón o automático) calculado en el servidor; el uso solo se registra al aprobarse el pago.
+    const discount = await resolveDiscount(tx, {
+      lines: [{ kind: 'course', id: edition.courseId, unitPrice: edition.price, quantity: 1 }],
+      shipping: { flatRate: 0, freeThreshold: null },
+      code: input.couponCode,
+      email: input.email,
+      now,
+    });
+    assertCodeAccepted(discount);
+    const payable = discount.priced.total;
+
     const [enrollment] = await tx
       .insert(enrollments)
       .values({
         editionId: edition.id,
         userId,
+        couponId: discount.coupon?.id ?? null,
+        discountAmount: discount.priced.itemDiscount,
         contactName: input.name,
         contactEmail: input.email,
         contactPhone: input.phone,
         contactDocument: input.document,
         status: holdsSeat ? 'reservada' : 'lista',
         paymentMode: input.mode,
-        totalAmount: edition.price,
+        totalAmount: payable,
         paidAmount: 0,
         reservedUntil: computeReservedUntil(
           now,
@@ -209,7 +223,7 @@ export async function createEnrollment(
     return {
       enrollment,
       token,
-      depositAmount: computeDeposit(edition.price, edition.depositType, edition.depositValue),
+      depositAmount: computeDeposit(payable, edition.depositType, edition.depositValue),
       seatsLeft,
     };
   });
@@ -345,6 +359,14 @@ export async function registerManualPayment(
       .where(eq(enrollments.id, current.id))
       .returning();
     await syncEditionStatus(tx, edition);
+    if (current.couponId) {
+      await recordRedemption(tx, {
+        couponId: current.couponId,
+        enrollmentId: current.id,
+        email: current.contactEmail,
+        discountAmount: current.discountAmount,
+      });
+    }
     await writeAudit(tx, {
       actorId,
       action: 'enrollment.manual_payment',

@@ -205,7 +205,7 @@ publicCoursesRoutes.get(
         enrollmentDeadline: row.edition.enrollmentDeadline,
         allowedPaymentModes: row.edition.allowedPaymentModes,
         depositAmount: computeDeposit(
-          row.edition.price,
+          e.totalAmount,
           row.edition.depositType,
           row.edition.depositValue,
         ),

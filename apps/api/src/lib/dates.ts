@@ -21,3 +21,13 @@ export function tomorrowRangeBogota(now: Date): { start: Date; end: Date } {
   );
   return { start, end: new Date(start.getTime() + 24 * 3_600_000) };
 }
+
+/** Fecha YYYY-MM-DD en America/Bogota (para contadores diarios de campañas). */
+export function bogotaDay(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}

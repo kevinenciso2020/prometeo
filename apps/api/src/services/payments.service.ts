@@ -28,6 +28,7 @@ import type { Mailer } from '../lib/mailer';
 import { withTransaction, type PoolOpener } from '../lib/tx';
 import { AuthError } from './auth.service';
 import { emailContext, occupiedSeats, safeSend, syncEditionStatus } from './enrollments.service';
+import { recordRedemption } from './discounts';
 import { issueGuestLink } from './guest-links';
 import { loadOrderWithItems, orderEmailCtx } from './orders.service';
 import { loadSettings } from './settings';
@@ -264,6 +265,14 @@ async function approve(
           stockDeducted: enough && ids.length > 0,
         })
         .where(eq(orders.id, order.id));
+      if (order.couponId) {
+        await recordRedemption(t, {
+          couponId: order.couponId,
+          orderId: order.id,
+          email: order.contactEmail,
+          discountAmount: order.discountTotal,
+        });
+      }
       return { type: 'order_paid', orderId: order.id, review: !enough } as const;
     }
 
@@ -294,15 +303,13 @@ async function approve(
       }
       const flag = async (reason: string) => {
         await markApproved(`REVISAR: ${reason}`);
-        await t
-          .insert(auditLogs)
-          .values({
-            actorId: null,
-            action: 'enrollment.payment_review',
-            entityType: 'enrollment',
-            entityId: e.id,
-            after: { reason, payment: pay.reference },
-          });
+        await t.insert(auditLogs).values({
+          actorId: null,
+          action: 'enrollment.payment_review',
+          entityType: 'enrollment',
+          entityId: e.id,
+          after: { reason, payment: pay.reference },
+        });
         return { type: 'enrollment_review', enrollmentId: e.id, reason } as const;
       };
 
@@ -331,6 +338,14 @@ async function approve(
         })
         .where(eq(enrollments.id, e.id));
       await syncEditionStatus(t, edition);
+      if (e.couponId) {
+        await recordRedemption(t, {
+          couponId: e.couponId,
+          enrollmentId: e.id,
+          email: e.contactEmail,
+          discountAmount: e.discountAmount,
+        });
+      }
       return { type: 'enrollment_paid', enrollmentId: e.id, fullyPaid: next === 'pagada' } as const;
     }
 
@@ -455,7 +470,7 @@ export async function createEnrollmentPayment(
     }
     amount = Math.min(
       pending,
-      computeDeposit(edition.price, edition.depositType, edition.depositValue),
+      computeDeposit(enrollment.totalAmount, edition.depositType, edition.depositValue),
     );
     purpose = amount >= pending ? 'total' : 'abono';
   }

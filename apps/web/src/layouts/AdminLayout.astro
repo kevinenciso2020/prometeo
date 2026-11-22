@@ -17,6 +17,8 @@ const links = [
   { href: '/admin/ediciones', key: 'ediciones', label: 'Ediciones' },
   { href: '/admin/servicios', key: 'servicios', label: 'Servicios' },
   { href: '/admin/cotizaciones', key: 'cotizaciones', label: 'Cotizaciones' },
+  { href: '/admin/campanas', key: 'campanas', label: 'Campañas' },
+  { href: '/admin/cupones', key: 'cupones', label: 'Cupones' },
   { href: '/admin/ajustes', key: 'ajustes', label: 'Ajustes' },
   ...(user?.role === 'SUPER_ADMIN' ? [{ href: '/admin/administradores', key: 'administradores', label: 'Administradores' }] : []),
 ];

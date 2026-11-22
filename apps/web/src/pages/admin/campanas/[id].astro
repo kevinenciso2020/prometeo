@@ -1,0 +1,137 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ImageUploader from '../../../components/ImageUploader.astro';
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Campaña" active="campanas">
+  <div class="page-head">
+    <h1 id="title">Campaña</h1>
+    <div class="actions"><a class="btn" href="/admin/campanas">Volver</a><button class="btn btn--danger" id="delete" type="button" hidden>Eliminar</button></div>
+  </div>
+  <form id="form" class="stack" data-id={id} novalidate>
+    <div class="card stack">
+      <h2>Contenido</h2>
+      <div class="grid-2">
+        <div class="field"><label for="name">Nombre interno</label><input class="input" id="name" name="name" required /></div>
+        <div class="field"><label for="placement">Ubicación</label>
+          <select class="select" id="placement" name="placement">
+            <option value="hero_banner">Hero (portada del inicio)</option><option value="banner_seccion">Banner de sección</option>
+            <option value="popup">Popup</option><option value="barra_superior">Barra superior</option>
+          </select></div>
+        <div class="field"><label for="title">Título</label><input class="input" id="title-f" name="title" /></div>
+        <div class="field"><label for="ctaText">Texto del botón</label><input class="input" id="ctaText" name="ctaText" /></div>
+      </div>
+      <div class="field"><label for="text">Texto</label><textarea class="textarea" id="text" name="text" style="min-height:4rem"></textarea></div>
+      <div class="field"><label for="ctaUrl">URL del botón</label><input class="input" id="ctaUrl" name="ctaUrl" placeholder="/tienda  o  https://…" /><span class="hint">Interna (/ruta) o externa (https). Si la dejas vacía y eliges un elemento promocionado, se usa su página.</span></div>
+    </div>
+
+    <div class="card stack">
+      <h2>Imágenes</h2>
+      <div class="grid-2">
+        <ImageUploader folder="prometeo/campaigns" label="Imagen escritorio (recomendado 2000×860)" max={1} />
+        <ImageUploader folder="prometeo/campaigns" label="Imagen móvil (recomendado 800×1000)" max={1} />
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h2>Vigencia y segmentación</h2>
+      <div class="grid-2">
+        <div class="field"><label for="startsAt">Inicio</label><input class="input" id="startsAt" name="startsAt" type="datetime-local" required /><span class="hint">Hora de Colombia.</span></div>
+        <div class="field"><label for="endsAt">Fin</label><input class="input" id="endsAt" name="endsAt" type="datetime-local" required /></div>
+        <div class="field"><label for="priority">Prioridad</label><input class="input" id="priority" name="priority" type="number" min="0" value="0" /><span class="hint">Mayor prioridad se muestra primero.</span></div>
+        <div class="field"><label for="popupFrequencyHours">Frecuencia del popup (horas)</label><input class="input" id="popupFrequencyHours" name="popupFrequencyHours" type="number" min="1" value="24" /></div>
+      </div>
+      <div class="field"><label for="pages">Páginas donde se muestra</label><textarea class="textarea" id="pages" name="pages" style="min-height:4rem" placeholder="Una por línea. Vacío = todas&#10;/&#10;/tienda&#10;/cursos*"></textarea><span class="hint">Una ruta por línea. Un * al final es comodín (/cursos* incluye /cursos/torno).</span></div>
+      <label class="check"><input type="checkbox" name="isActive" checked /> Activa</label>
+    </div>
+
+    <div class="card stack">
+      <h2>Promociona (opcional)</h2>
+      <div class="grid-2">
+        <div class="field"><label for="targetType">Tipo</label>
+          <select class="select" id="targetType" name="targetType"><option value="">Ninguno</option><option value="producto">Producto</option><option value="curso">Curso</option><option value="edicion">Edición</option><option value="categoria">Categoría</option></select></div>
+        <div class="field"><label for="targetId">Elemento</label><select class="select" id="targetId" name="targetId" disabled><option value="">—</option></select></div>
+        <div class="field"><label for="couponId">Cupón vinculado</label><select class="select" id="couponId" name="couponId"><option value="">Ninguno</option></select><span class="hint">Se muestra el código en la campaña.</span></div>
+      </div>
+    </div>
+    <p class="form-error" id="error" role="alert"></p>
+    <div><button class="btn btn--primary" type="submit">Guardar campaña</button></div>
+  </form>
+
+  <script>
+    import { $, api, errorMessage, fillForm, readForm, toBogotaIso, toBogotaLocal, toast } from '../../../lib/admin-client';
+    type Img = { url: string; publicId: string; alt: string | null; isPrimary: boolean };
+    type Uploader = HTMLElement & { getImages(): Img[]; setImages(i: Img[]): void; markSaved(): void };
+    const form = $<HTMLFormElement>('#form');
+    const [desktop, mobile] = [...document.querySelectorAll<Uploader>('image-uploader')] as [Uploader, Uploader];
+    const error = $('#error');
+    const id = form.dataset.id && form.dataset.id !== 'nueva' ? form.dataset.id : null;
+    const typeSel = $<HTMLSelectElement>('#targetType');
+    const targetSel = $<HTMLSelectElement>('#targetId');
+
+    interface Opt { id: string; label: string }
+    async function targets(type: string): Promise<Opt[]> {
+      if (type === 'producto') return (await api<{ items: { id: string; name: string }[] }>('/admin/products?pageSize=100')).items.map((x) => ({ id: x.id, label: x.name }));
+      if (type === 'curso') return (await api<{ items: { id: string; name: string }[] }>('/admin/courses?pageSize=100')).items.map((x) => ({ id: x.id, label: x.name }));
+      if (type === 'edicion') return (await api<{ items: { id: string; courseName: string; firstStart: string | null }[] }>('/admin/editions')).items.map((x) => ({ id: x.id, label: `${x.courseName} · ${x.firstStart ? new Date(x.firstStart).toLocaleDateString('es-CO') : 's/f'}` }));
+      if (type === 'categoria') return (await api<{ items: { id: string; name: string }[] }>('/admin/categories')).items.map((x) => ({ id: x.id, label: x.name }));
+      return [];
+    }
+    async function loadTargets(type: string, selected = '') {
+      targetSel.replaceChildren(new Option(type ? 'Selecciona…' : '—', ''));
+      targetSel.disabled = !type;
+      if (!type) return;
+      for (const o of await targets(type)) targetSel.append(new Option(o.label, o.id));
+      targetSel.value = selected;
+    }
+    typeSel.addEventListener('change', () => void loadTargets(typeSel.value));
+
+    async function init() {
+      const cs = await api<{ items: { id: string; code: string | null; isAutomatic: boolean }[] }>('/admin/coupons?kind=codigo');
+      for (const c of cs.items) $<HTMLSelectElement>('#couponId').append(new Option(c.code ?? c.id, c.id));
+      if (!id) {
+        $('#title').textContent = 'Nueva campaña';
+        const now = Date.now();
+        $<HTMLInputElement>('#startsAt').value = toBogotaLocal(new Date(now));
+        $<HTMLInputElement>('#endsAt').value = toBogotaLocal(new Date(now + 14 * 86_400_000));
+        return;
+      }
+      const { item } = await api<{ item: Record<string, unknown> & { imageDesktopUrl: string | null; imageDesktopPublicId: string | null; imageMobileUrl: string | null; imageMobilePublicId: string | null; startsAt: string; endsAt: string; pages: string[]; targetType: string | null; targetId: string | null } }>(`/admin/campaigns/${id}`);
+      $('#title').textContent = String(item.name);
+      fillForm(form, { ...item, title: undefined, startsAt: toBogotaLocal(item.startsAt), endsAt: toBogotaLocal(item.endsAt), pages: item.pages.join('\n') });
+      $<HTMLInputElement>('#title-f').value = String(item.title ?? '');
+      if (item.imageDesktopUrl && item.imageDesktopPublicId) desktop.setImages([{ url: item.imageDesktopUrl, publicId: item.imageDesktopPublicId, alt: null, isPrimary: true }]);
+      if (item.imageMobileUrl && item.imageMobilePublicId) mobile.setImages([{ url: item.imageMobileUrl, publicId: item.imageMobilePublicId, alt: null, isPrimary: true }]);
+      await loadTargets(item.targetType ?? '', item.targetId ?? '');
+      $<HTMLButtonElement>('#delete').hidden = false;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      const v = readForm(form);
+      const d = desktop.getImages()[0];
+      const m = mobile.getImages()[0];
+      const body = {
+        name: v.name, placement: v.placement, title: $<HTMLInputElement>('#title-f').value.trim() || null, text: v.text, ctaText: v.ctaText, ctaUrl: v.ctaUrl,
+        imageDesktopUrl: d?.url ?? null, imageDesktopPublicId: d?.publicId ?? null, imageMobileUrl: m?.url ?? null, imageMobilePublicId: m?.publicId ?? null,
+        startsAt: v.startsAt ? toBogotaIso(String(v.startsAt)) : '', endsAt: v.endsAt ? toBogotaIso(String(v.endsAt)) : '',
+        priority: v.priority ?? 0, popupFrequencyHours: v.popupFrequencyHours ?? 24, isActive: v.isActive,
+        pages: String(v.pages ?? '').split('\n').map((x) => x.trim()).filter(Boolean),
+        targetType: v.targetType, targetId: v.targetId, couponId: v.couponId,
+      };
+      try {
+        const r = id ? await api<{ item: { id: string } }>(`/admin/campaigns/${id}`, 'PUT', body) : await api<{ item: { id: string } }>('/admin/campaigns', 'POST', body);
+        desktop.markSaved(); mobile.markSaved();
+        toast('Campaña guardada');
+        if (!id) location.href = `/admin/campanas/${r.item.id}`;
+      } catch (err) { error.textContent = errorMessage(err); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
+    });
+    $('#delete').addEventListener('click', async () => {
+      if (!id || !confirm('¿Eliminar esta campaña y sus imágenes? También se pierden sus métricas.')) return;
+      try { await api(`/admin/campaigns/${id}`, 'DELETE'); location.href = '/admin/campanas'; } catch (err) { toast(errorMessage(err), 'error'); }
+    });
+    void init().catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

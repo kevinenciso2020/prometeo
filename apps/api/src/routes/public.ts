@@ -20,7 +20,8 @@ import { pageInfo } from '../lib/pagination';
 import { validate } from '../lib/validate';
 import { rateLimit } from '../middleware/rate-limit';
 import { AuthError } from '../services/auth.service';
-import { priceCart, summarizeCart } from '../services/cart';
+import { priceCart, shippingConfig, toPricingLines } from '../services/cart';
+import { resolveDiscount } from '../services/discounts';
 import { loadSettings } from '../services/settings';
 
 /** Endpoints públicos (sin sesión). Solo exponen contenido publicado. */
@@ -209,15 +210,38 @@ publicRoutes.post(
   validate('json', cartQuoteSchema),
   async (c) => {
     const db = c.get('db');
-    const lines = await priceCart(db, c.req.valid('json').items);
+    const { items, couponCode } = c.req.valid('json');
+    const lines = await priceCart(db, items);
     const settings = await loadSettings(db);
-    const { subtotal, shipping, total } = summarizeCart(lines, settings);
+    // El correo aún no se conoce: el límite por correo se valida en el checkout.
+    const d = await resolveDiscount(db, {
+      lines: toPricingLines(lines),
+      shipping: shippingConfig(settings),
+      code: couponCode,
+      email: null,
+    });
+    const { subtotal, itemDiscount, shipping, total } = d.priced;
     return c.json({
       lines,
       subtotal,
+      itemDiscount,
       shipping,
       total,
       freeShippingThreshold: settings.free_shipping_threshold,
+      coupon: {
+        applied: d.coupon
+          ? {
+              code: d.coupon.code,
+              description: d.coupon.description,
+              type: d.coupon.type,
+              isAutomatic: d.coupon.isAutomatic,
+              itemDiscount: d.priced.applied?.itemDiscount ?? 0,
+              shippingSaved: d.priced.applied?.shippingSaved ?? 0,
+            }
+          : null,
+        status: d.codeStatus,
+        message: d.message,
+      },
     });
   },
 );

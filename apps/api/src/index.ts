@@ -12,6 +12,7 @@ import { createCloudinary, type CloudinaryClient } from './lib/cloudinary';
 import { authRoutes } from './routes/auth';
 import { health } from './routes/health';
 import { publicRoutes } from './routes/public';
+import { publicCampaignRoutes } from './routes/public-campaigns';
 import { publicCoursesRoutes } from './routes/public-courses';
 import { publicOrderRoutes } from './routes/public-orders';
 import { webhooks } from './routes/webhooks';
@@ -56,6 +57,7 @@ export function createApp(deps: AppDeps = {}) {
   app.route('/public', publicRoutes);
   app.route('/public', publicCoursesRoutes);
   app.route('/public', publicOrderRoutes);
+  app.route('/public', publicCampaignRoutes);
   app.route('/account', accountRoutes);
   app.route('/webhooks', webhooks);
 

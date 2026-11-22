@@ -1,0 +1,43 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Cupones" active="cupones">
+  <div class="page-head">
+    <h1>Cupones y descuentos</h1>
+    <a class="btn btn--primary" href="/admin/cupones/nuevo">Nuevo cupón</a>
+  </div>
+  <form class="toolbar" id="filters">
+    <select class="select" name="kind" aria-label="Tipo"><option value="">Todos</option><option value="codigo">Con código</option><option value="automatico">Automáticos</option></select>
+    <button class="btn" type="submit">Filtrar</button>
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Cupón</th><th>Descuento</th><th>Aplica a</th><th>Vigencia</th><th class="num">Usos</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin-top: var(--space-4); color: var(--color-ink-mute)">Los descuentos no se acumulan: a cada compra se le aplica el que más beneficie al cliente. Un uso solo cuenta cuando el pago se aprueba.</p>
+  <script>
+    import { $, api, errorMessage, esc, fmtBogota, formatCop, toast } from '../../../lib/admin-client';
+    interface Row { id: string; code: string | null; type: string; value: number; appliesTo: string; startsAt: string | null; endsAt: string | null; maxUses: number | null; uses: number; isAutomatic: boolean; isActive: boolean; description: string | null }
+    const SCOPE: Record<string, string> = { todo: 'Todo', productos: 'Productos', cursos: 'Cursos', categorias: 'Categorías', items: 'Ítems' };
+    const form = $<HTMLFormElement>('#filters');
+    const desc = (c: Row) => (c.type === 'porcentaje' ? `${c.value}%` : c.type === 'monto_fijo' ? formatCop(c.value) : 'Envío gratis');
+    async function load() {
+      const kind = new FormData(form).get('kind');
+      try {
+        const r = await api<{ items: Row[] }>(`/admin/coupons${kind ? `?kind=${kind}` : ''}`);
+        $('#rows').innerHTML = r.items.length
+          ? r.items.map((c) => `<tr><td><a href="/admin/cupones/${c.id}"><strong>${esc(c.code ?? 'Automático')}</strong></a>${c.isAutomatic ? ' <span class="badge">Auto</span>' : ''}<br><small>${esc(c.description ?? '')}</small></td>
+              <td>${desc(c)}</td><td>${esc(SCOPE[c.appliesTo] ?? c.appliesTo)}</td><td><small>${c.startsAt ? fmtBogota(c.startsAt) : 'Sin inicio'}<br>${c.endsAt ? '→ ' + fmtBogota(c.endsAt) : 'Sin fin'}</small></td>
+              <td class="num">${c.uses}${c.maxUses ? ` / ${c.maxUses}` : ''}</td>
+              <td><span class="badge ${c.isActive ? 'badge--solid' : 'badge--mute'}">${c.isActive ? 'Activo' : 'Inactivo'}</span></td>
+              <td class="actions"><a class="btn btn--sm" href="/admin/cupones/${c.id}">Editar</a></td></tr>`).join('')
+          : '<tr><td colspan="7" class="empty">Aún no hay cupones</td></tr>';
+      } catch (err) { toast(errorMessage(err), 'error'); }
+    }
+    form.addEventListener('submit', (e) => { e.preventDefault(); void load(); });
+    void load();
+  </script>
+</AdminLayout>

@@ -1,0 +1,74 @@
+---
+import type { PublicCampaign } from '../lib/campaigns';
+interface Props {
+  campaign: PublicCampaign;
+}
+const { campaign: c } = Astro.props;
+const text = c.text ?? c.title ?? '';
+const external = c.ctaUrl?.startsWith('https://') ?? false;
+---
+
+<div class="bar" id="campaign-bar" role="region" aria-label="Aviso" data-campaign-id={c.id} data-track="view" hidden>
+  <p>
+    {text}
+    {c.couponCode && <strong> Código: {c.couponCode}</strong>}
+    {
+      c.ctaText && c.ctaUrl && (
+        <a href={c.ctaUrl} data-campaign-cta={c.id} rel={external ? 'noopener noreferrer' : undefined} target={external ? '_blank' : undefined}>{c.ctaText} →</a>
+      )
+    }
+  </p>
+  <button type="button" id="campaign-bar-close" aria-label="Cerrar aviso">✕</button>
+</div>
+
+<style>
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-inverse-bg);
+    color: var(--color-inverse-ink);
+    font-size: var(--text-sm);
+    text-align: center;
+  }
+  .bar[hidden] {
+    display: none;
+  }
+  .bar a {
+    margin-left: var(--space-2);
+    font-weight: 600;
+  }
+  .bar :focus-visible {
+    outline-color: var(--color-inverse-ink);
+  }
+  button {
+    background: none;
+    border: 0;
+    color: inherit;
+    padding: var(--space-1) var(--space-2);
+  }
+</style>
+
+<script>
+  const bar = document.getElementById('campaign-bar');
+  if (bar) {
+    const key = `prometeo_bar_${bar.dataset.campaignId}`;
+    let closed = false;
+    try {
+      closed = sessionStorage.getItem(key) === '1';
+    } catch {
+      /* sin almacenamiento: se muestra siempre */
+    }
+    bar.hidden = closed;
+    document.getElementById('campaign-bar-close')?.addEventListener('click', () => {
+      bar.hidden = true;
+      try {
+        sessionStorage.setItem(key, '1');
+      } catch {
+        /* ignorar */
+      }
+    });
+  }
+</script>

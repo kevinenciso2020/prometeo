@@ -11,6 +11,16 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
     <div class="card stat"><span>Categorías</span><strong id="n-categories">–</strong></div>
     <div class="card stat"><span>Servicios</span><strong id="n-services">–</strong></div>
   </div>
+  <h2 style="margin-top: var(--space-7); margin-bottom: var(--space-4)">Campañas · últimos 30 días</h2>
+  <div class="stats">
+    <div class="card stat"><span>Impresiones</span><strong id="m-imp">–</strong></div>
+    <div class="card stat"><span>Clics</span><strong id="m-clk">–</strong></div>
+    <div class="card stat"><span>CTR</span><strong id="m-ctr">–</strong></div>
+    <div class="card stat"><span>Campañas en vivo</span><strong id="m-act">–</strong></div>
+  </div>
+  <div class="table-wrap" style="margin-top: var(--space-4)">
+    <table class="table"><thead><tr><th>Mejores campañas</th><th class="num">Impresiones</th><th class="num">Clics</th><th class="num">CTR</th></tr></thead><tbody id="m-top"></tbody></table>
+  </div>
   <p class="hint" style="margin-top: var(--space-6); color: var(--color-ink-mute)">
     Ventas, pedidos, ediciones e inscripciones se sumarán al panel en las próximas fases.
   </p>
@@ -20,6 +30,17 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
       const el = document.getElementById(id);
       if (el) el.textContent = String(n);
     };
+    interface M { impressions: number; clicks: number; ctr: number; activeCampaigns: number; top: { name: string; impressions: number; clicks: number; ctr: number }[] }
+    const text = (id: string, v: string) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    void api<M>('/admin/campaigns/metrics?days=30').then((m) => {
+      text('m-imp', String(m.impressions)); text('m-clk', String(m.clicks)); text('m-ctr', `${m.ctr}%`); text('m-act', String(m.activeCampaigns));
+      const body = document.getElementById('m-top');
+      if (body) body.replaceChildren(...(m.top.length ? m.top : [{ name: 'Sin datos todavía', impressions: 0, clicks: 0, ctr: 0 }]).map((t) => {
+        const tr = document.createElement('tr');
+        for (const [i, v] of [t.name, String(t.impressions), String(t.clicks), `${t.ctr}%`].entries()) { const td = document.createElement('td'); td.textContent = v; if (i > 0) td.className = 'num'; tr.append(td); }
+        return tr;
+      }));
+    }).catch(() => undefined);
     void api<{ total: number }>('/admin/products?pageSize=1').then((r) => set('n-products', r.total));
     void api<{ total: number }>('/admin/services?pageSize=1').then((r) => set('n-services', r.total));
     void api<{ items: unknown[] }>('/admin/categories').then((r) => set('n-categories', r.items.length));

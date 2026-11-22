@@ -1,0 +1,43 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Campañas" active="campanas">
+  <div class="page-head">
+    <h1>Campañas</h1>
+    <a class="btn btn--primary" href="/admin/campanas/nueva">Nueva campaña</a>
+  </div>
+  <form class="toolbar" id="filters">
+    <select class="select" name="days" aria-label="Periodo de métricas">
+      <option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option>
+    </select>
+    <button class="btn" type="submit">Actualizar</button>
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Campaña</th><th>Ubicación</th><th>Vigencia</th><th class="num">Impresiones</th><th class="num">Clics</th><th class="num">CTR</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <script>
+    import { $, api, errorMessage, esc, fmtBogota, toast } from '../../../lib/admin-client';
+    interface Row { id: string; name: string; placement: string; startsAt: string; endsAt: string; live: boolean; isActive: boolean; recent: { impressions: number; clicks: number; ctr: number } }
+    const PLACE: Record<string, string> = { hero_banner: 'Hero', banner_seccion: 'Banner de sección', popup: 'Popup', barra_superior: 'Barra superior' };
+    const form = $<HTMLFormElement>('#filters');
+    async function load() {
+      const days = new FormData(form).get('days') ?? '30';
+      try {
+        const r = await api<{ items: Row[] }>(`/admin/campaigns?days=${days}`);
+        $('#rows').innerHTML = r.items.length
+          ? r.items.map((c) => `<tr><td><a href="/admin/campanas/${c.id}"><strong>${esc(c.name)}</strong></a><br>
+              <span class="badge ${c.live ? 'badge--solid' : 'badge--mute'}">${c.live ? 'En vivo' : c.isActive ? 'Programada/vencida' : 'Inactiva'}</span></td>
+              <td>${esc(PLACE[c.placement] ?? c.placement)}</td><td><small>${fmtBogota(c.startsAt)}<br>→ ${fmtBogota(c.endsAt)}</small></td>
+              <td class="num">${c.recent.impressions}</td><td class="num">${c.recent.clicks}</td><td class="num">${c.recent.ctr}%</td>
+              <td class="actions"><a class="btn btn--sm" href="/admin/campanas/${c.id}">Editar</a></td></tr>`).join('')
+          : '<tr><td colspan="7" class="empty">Aún no hay campañas</td></tr>';
+      } catch (err) { toast(errorMessage(err), 'error'); }
+    }
+    form.addEventListener('submit', (e) => { e.preventDefault(); void load(); });
+    void load();
+  </script>
+</AdminLayout>

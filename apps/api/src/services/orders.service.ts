@@ -6,7 +6,8 @@ import { randomHex } from '../lib/random';
 import { orderCode, type OrderEmailCtx } from '../lib/order-emails';
 import { withTransaction, type PoolOpener } from '../lib/tx';
 import { AuthError } from './auth.service';
-import { priceCart, summarizeCart } from './cart';
+import { priceCart, shippingConfig, toPricingLines } from './cart';
+import { assertCodeAccepted, resolveDiscount } from './discounts';
 import { issueGuestLink } from './guest-links';
 import type { LoadedSettings } from './settings';
 import { buildWompiCheckout } from '../lib/wompi';
@@ -46,7 +47,15 @@ export async function createOrder(
         `Hay productos no disponibles en tu carrito (${detail})`,
       );
     }
-    const { subtotal, shipping, total, hasShippable } = summarizeCart(lines, settings);
+    const hasShippable = lines.some((l) => l.type === 'product');
+    const discount = await resolveDiscount(tx, {
+      lines: toPricingLines(lines),
+      shipping: shippingConfig(settings),
+      code: input.couponCode,
+      email: input.email,
+    });
+    assertCodeAccepted(discount);
+    const { subtotal, itemDiscount, shipping, total } = discount.priced;
     if (hasShippable && !input.shipping)
       throw new AuthError(400, 'SHIPPING_REQUIRED', 'Ingresa la dirección de envío');
     if (total <= 0) throw new AuthError(400, 'EMPTY_ORDER', 'El pedido no tiene valor a pagar');
@@ -77,7 +86,8 @@ export async function createOrder(
         contactPhone: input.phone,
         contactDocument: input.document,
         subtotal,
-        discountTotal: 0,
+        discountTotal: itemDiscount,
+        couponId: discount.coupon?.id ?? null,
         shippingTotal: shipping,
         total,
         shippingAddress: address,
