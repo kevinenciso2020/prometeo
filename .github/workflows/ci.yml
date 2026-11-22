@@ -49,19 +49,27 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT }}
 
-      # 2) API (Worker + cron triggers + rate limiting definidos en wrangler.toml).
+      # 2) API (Worker + cron + rate limiting del bloque [env.production] de wrangler.toml).
+      - name: Verificar que wrangler.toml no tenga placeholders
+        run: |
+          if sed -n '/^\[env.production/,$p' apps/api/wrangler.toml | grep -v '^#' | grep -q '<'; then
+            echo "::error::apps/api/wrangler.toml [env.production] aún tiene valores <…> sin reemplazar"; exit 1
+          fi
       - name: Desplegar API
         working-directory: apps/api
-        run: pnpm exec wrangler deploy
+        run: pnpm exec wrangler deploy --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # 3) Web (Astro). PUBLIC_API_URL se incrusta en el build.
+      # 3) Web (Astro). Las PUBLIC_* se incrustan en el build: sin ellas la subida a
+      #    Cloudinary y el SEO (canonical/sitemap) quedan apuntando a valores de desarrollo.
       - name: Compilar web
         run: pnpm --filter @prometeo/web build
         env:
           PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+          PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ vars.PUBLIC_CLOUDINARY_CLOUD_NAME }}
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
       - name: Desplegar web
         working-directory: apps/web
         run: pnpm exec wrangler deploy

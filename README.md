@@ -32,7 +32,7 @@ Arquitectura: dos Workers — `prometeo-api` en `api.<dominio>` y `prometeo-web`
 
 ### 2. API
 
-Edita `apps/api/wrangler.toml` `[vars]`:
+Edita el bloque **`[env.production.vars]`** de `apps/api/wrangler.toml` (el `[vars]` de arriba es solo para desarrollo local; wrangler no hereda variables entre entornos):
 
 | Variable                | Producción                                                     |
 | ----------------------- | -------------------------------------------------------------- |
@@ -47,19 +47,23 @@ Edita `apps/api/wrangler.toml` `[vars]`:
 Secretos (`cd apps/api`):
 
 ```bash
-pnpm exec wrangler secret put DATABASE_URL            # cadena pooled
-pnpm exec wrangler secret put JWT_SECRET              # openssl rand -base64 48
-pnpm exec wrangler secret put RESEND_API_KEY
-pnpm exec wrangler secret put CLOUDINARY_API_KEY
-pnpm exec wrangler secret put CLOUDINARY_API_SECRET
-pnpm exec wrangler secret put WOMPI_INTEGRITY_SECRET  # de producción
-pnpm exec wrangler secret put WOMPI_EVENTS_SECRET     # de producción
-pnpm exec wrangler deploy
+pnpm exec wrangler secret put DATABASE_URL --env production            # cadena pooled
+pnpm exec wrangler secret put JWT_SECRET --env production              # openssl rand -base64 48
+pnpm exec wrangler secret put RESEND_API_KEY --env production
+pnpm exec wrangler secret put CLOUDINARY_API_KEY --env production
+pnpm exec wrangler secret put CLOUDINARY_API_SECRET --env production
+pnpm exec wrangler secret put WOMPI_INTEGRITY_SECRET --env production  # de producción
+pnpm exec wrangler secret put WOMPI_EVENTS_SECRET --env production     # de producción
+pnpm exec wrangler deploy --env production
 ```
 
-Los **Cron Triggers** (`*/15 * * * *`, `0 * * * *`, `0 10 * * *`) y los límites de **Rate Limiting** (`[[ratelimits]]`) se publican con `wrangler deploy`. Cada ejecución del cron deja logs (`wrangler tail`).
+Los **Cron Triggers** (`*/15 * * * *`, `0 * * * *`, `0 10 * * *`) y los límites de **Rate Limiting** (`[[env.production.ratelimits]]`) se publican con `wrangler deploy --env production`. Cada ejecución del cron deja logs (`wrangler tail`).
 
-### 3. Web
+### 3. Cloudinary
+
+El panel sube las imágenes directamente a Cloudinary con una firma que genera la API (`POST /admin/uploads/signature`, solo admin). Solo necesitas: `CLOUDINARY_CLOUD_NAME` (variable de la API y `PUBLIC_CLOUDINARY_CLOUD_NAME` en el build de la web, mismo valor) y los secretos `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` en la API. Las carpetas `prometeo/products`, `prometeo/courses`, `prometeo/campaigns`, etc. se crean solas en la primera subida.
+
+### 4. Web
 
 ```bash
 PUBLIC_API_URL=https://api.<dominio> pnpm --filter @prometeo/web build
@@ -68,21 +72,21 @@ cd apps/web && pnpm exec wrangler deploy
 
 `PUBLIC_API_URL` se incrusta al compilar. El `SESSION` KV que pide el adaptador se aprovisiona solo en el primer deploy.
 
-### 4. Dominio y DNS
+### 5. Dominio y DNS
 
 1. Añade el dominio a Cloudflare y apunta los nameservers.
 2. Workers & Pages → `prometeo-web` → Domains: `<dominio>` y `www`. `prometeo-api` → `api.<dominio>`. Cloudflare crea los registros DNS y los certificados.
 3. Resend: añade los registros SPF/DKIM/DMARC que indica para `EMAIL_FROM`.
 4. Wompi: en Desarrolladores configura la URL de eventos `https://api.<dominio>/webhooks/wompi`.
 
-### 5. CI/CD (GitHub Actions)
+### 6. CI/CD (GitHub Actions)
 
 `.github/workflows/ci.yml`: en cada PR corre lint, typecheck, tests y build. En `push` a `main` migra la BD y despliega API y web.
 
 Configura en GitHub → Settings (entorno `production`):
 
 - Secrets: `CLOUDFLARE_API_TOKEN` (permiso _Workers Scripts: Edit_), `CLOUDFLARE_ACCOUNT_ID`, `DATABASE_URL_DIRECT`.
-- Variable: `PUBLIC_API_URL`.
+- Variables: `PUBLIC_API_URL`, `PUBLIC_CLOUDINARY_CLOUD_NAME`, `PUBLIC_SITE_URL`.
 
 Los secretos del Worker **no** pasan por CI: se cargan una vez con `wrangler secret put`.
 

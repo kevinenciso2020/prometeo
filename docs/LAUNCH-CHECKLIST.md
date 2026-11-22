@@ -11,6 +11,7 @@ Marca cada ítem antes de abrir al público.
 - [ ] `ENVIRONMENT=production`, `WEB_ORIGIN`, `WEB_URL`, `COOKIE_DOMAIN=.<dominio>` correctos (cookies `Secure`, CORS, Origin).
 - [ ] DNS, certificados, `www` → apex (o viceversa) y `api.<dominio>` activos. HSTS solo después de confirmar HTTPS estable.
 - [ ] Resend: dominio verificado (SPF/DKIM/DMARC) y correo de prueba entregado a bandeja (no spam).
+- [ ] Web compilada con `PUBLIC_API_URL`, `PUBLIC_SITE_URL` y `PUBLIC_CLOUDINARY_CLOUD_NAME` de producción; subir una imagen de prueba desde el panel y verla en la tienda.
 - [ ] Cron triggers visibles en el dashboard y un ciclo observado con `wrangler tail`.
 - [ ] Monitoreo de errores/uptime configurado (p. ej. Sentry o Cloudflare Logs + alerta de uptime en `/health`).
 
