@@ -1,0 +1,99 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+const { reference, token } = Astro.params;
+---
+
+<BaseLayout title="Resultado del pago" noindex cacheable={false} description="Resultado de tu pago">
+  <div class="container section">
+    <div class="box" id="box" data-ref={reference} data-token={token}>
+      <p class="eyebrow" id="eyebrow">Pago</p>
+      <h1 id="title">Confirmando tu pago…</h1>
+      <p id="text" role="status" aria-live="polite">Estamos esperando la confirmación de Wompi. No cierres esta página.</p>
+      <div class="actions" id="actions"></div>
+    </div>
+  </div>
+
+  <script>
+    import { formatCop } from '@prometeo/shared';
+    import { API_URL } from '../../../../lib/site';
+    import { clearCart } from '../../../../lib/cart';
+
+    interface P { payment: { status: string; kind: 'order' | 'enrollment'; amount: number } }
+    const box = document.getElementById('box') as HTMLElement;
+    const ref = box.dataset.ref ?? '';
+    const token = box.dataset.token ?? '';
+    const set = (id: string, v: string) => ((document.getElementById(id) as HTMLElement).textContent = v);
+    const actions = document.getElementById('actions') as HTMLElement;
+    let tries = 0;
+
+    function link(href: string, label: string, primary = false) {
+      const a = document.createElement('a');
+      a.href = href;
+      a.className = primary ? 'btn btn--primary' : 'btn';
+      a.textContent = label;
+      actions.append(a);
+    }
+
+    async function poll() {
+      tries++;
+      try {
+        const res = await fetch(`${API_URL}/public/payments/${ref}`);
+        if (!res.ok) throw new Error('status');
+        const { payment: p } = (await res.json()) as P;
+        const mine = p.kind === 'order' ? `/pedido/${token}` : `/inscripcion/${token}`;
+        actions.replaceChildren();
+        if (p.status === 'aprobado') {
+          clearCart();
+          set('eyebrow', 'Pago aprobado');
+          set('title', '¡Gracias! Recibimos tu pago');
+          set('text', `Pago de ${formatCop(p.amount)} confirmado. Te enviamos los detalles por correo.`);
+          link(mine, p.kind === 'order' ? 'Ver mi pedido' : 'Ver mi inscripción', true);
+          return;
+        }
+        if (['rechazado', 'error', 'anulado'].includes(p.status)) {
+          set('eyebrow', 'Pago no completado');
+          set('title', 'Tu pago no se completó');
+          set('text', 'No se te cobró. Puedes intentarlo de nuevo con otro medio de pago.');
+          link(mine, 'Reintentar el pago', true);
+          return;
+        }
+        if (tries >= 30) {
+          set('title', 'Aún estamos confirmando tu pago');
+          set('text', 'Wompi está tardando en confirmar. Te avisaremos por correo apenas se apruebe; también puedes revisar el estado en tu enlace.');
+          link(mine, 'Ver el estado', true);
+          return;
+        }
+        setTimeout(poll, 3000);
+      } catch {
+        if (tries >= 30) {
+          set('title', 'No pudimos consultar el pago');
+          set('text', 'Revisa tu correo: te enviaremos la confirmación cuando se apruebe.');
+          return;
+        }
+        setTimeout(poll, 4000);
+      }
+    }
+    void poll();
+  </script>
+</BaseLayout>
+
+<style>
+  .box {
+    max-width: 38rem;
+    margin-inline: auto;
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: var(--space-6);
+    display: grid;
+    gap: var(--space-3);
+  }
+  h1 {
+    font-size: var(--text-2xl);
+  }
+  .actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-3);
+  }
+</style>

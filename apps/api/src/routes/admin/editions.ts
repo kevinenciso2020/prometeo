@@ -104,15 +104,13 @@ editionsRoutes.post('/', validate('json', editionSchema), async (c) => {
     })
     .returning();
   if (!row) throw new Error('No se pudo crear la edición');
-  await db
-    .insert(editionSessions)
-    .values(
-      sessions.map((s) => ({
-        editionId: row.id,
-        startsAt: new Date(s.startsAt),
-        endsAt: new Date(s.endsAt),
-      })),
-    );
+  await db.insert(editionSessions).values(
+    sessions.map((s) => ({
+      editionId: row.id,
+      startsAt: new Date(s.startsAt),
+      endsAt: new Date(s.endsAt),
+    })),
+  );
   await writeAudit(db, {
     actorId: c.get('user')?.id ?? null,
     action: 'edition.create',
@@ -157,15 +155,13 @@ editionsRoutes.put(
       .where(eq(courseEditions.id, id))
       .returning();
     await db.delete(editionSessions).where(eq(editionSessions.editionId, id));
-    await db
-      .insert(editionSessions)
-      .values(
-        sessions.map((s) => ({
-          editionId: id,
-          startsAt: new Date(s.startsAt),
-          endsAt: new Date(s.endsAt),
-        })),
-      );
+    await db.insert(editionSessions).values(
+      sessions.map((s) => ({
+        editionId: id,
+        startsAt: new Date(s.startsAt),
+        endsAt: new Date(s.endsAt),
+      })),
+    );
     if (before.price !== input.price) {
       await writeAudit(db, {
         actorId: c.get('user')?.id ?? null,

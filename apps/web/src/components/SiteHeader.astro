@@ -23,6 +23,7 @@ const links = [
         ))}
       </ul>
     </nav>
+    <a class="acct" href="/mi-cuenta">Mi cuenta</a>
     <a class="cart btn btn--sm" href="/carrito" aria-label="Carrito de compras">
       Carrito <span class="cart__n" id="cart-count" aria-live="polite">0</span>
     </a>
@@ -67,6 +68,10 @@ const links = [
   .nav a:hover,
   .nav a[aria-current='page'] {
     border-bottom-color: var(--color-ink);
+  }
+  .acct {
+    font-size: var(--text-sm);
+    font-weight: 500;
   }
   .cart__n {
     background: var(--color-ink);

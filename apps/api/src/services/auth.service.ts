@@ -18,7 +18,7 @@ import type { Mailer } from '../lib/mailer';
 
 export class AuthError extends Error {
   constructor(
-    public readonly status: 400 | 401 | 403 | 404,
+    public readonly status: 400 | 401 | 403 | 404 | 409,
     public readonly code: string,
     message: string,
   ) {

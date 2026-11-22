@@ -10,7 +10,6 @@ import {
 } from '@prometeo/db';
 import {
   cartQuoteSchema,
-  computeShipping,
   publicProductsQuerySchema,
   quoteRequestSchema,
   slugParamSchema,
@@ -21,6 +20,7 @@ import { pageInfo } from '../lib/pagination';
 import { validate } from '../lib/validate';
 import { rateLimit } from '../middleware/rate-limit';
 import { AuthError } from '../services/auth.service';
+import { priceCart, summarizeCart } from '../services/cart';
 import { loadSettings } from '../services/settings';
 
 /** Endpoints públicos (sin sesión). Solo exponen contenido publicado. */
@@ -209,106 +209,14 @@ publicRoutes.post(
   validate('json', cartQuoteSchema),
   async (c) => {
     const db = c.get('db');
-    const { items } = c.req.valid('json');
+    const lines = await priceCart(db, c.req.valid('json').items);
     const settings = await loadSettings(db);
-
-    const lines = [];
-    for (const it of items) {
-      if (it.type === 'product') {
-        const [p] = await db
-          .select({
-            id: products.id,
-            name: products.name,
-            slug: products.slug,
-            price: products.price,
-            stock: products.stock,
-            isUnique: products.isUnique,
-            image: primaryImage('product'),
-          })
-          .from(products)
-          .where(and(eq(products.id, it.id), eq(products.status, 'publicado')))
-          .limit(1);
-        if (!p) {
-          lines.push({
-            type: it.type,
-            id: it.id,
-            available: false,
-            reason: 'Ya no está disponible',
-          });
-          continue;
-        }
-        const qty = Math.min(it.quantity, p.isUnique ? 1 : 20);
-        const ok = p.stock >= qty;
-        lines.push({
-          type: it.type,
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          image: p.image,
-          unitPrice: p.price,
-          quantity: qty,
-          stock: p.stock,
-          available: ok,
-          lineTotal: ok ? p.price * qty : 0,
-          reason: ok ? null : p.stock === 0 ? 'Agotado' : `Solo quedan ${p.stock}`,
-        });
-      } else {
-        const [s] = await db
-          .select({
-            id: services.id,
-            name: services.name,
-            slug: services.slug,
-            price: services.price,
-            image: primaryImage('service'),
-          })
-          .from(services)
-          .where(
-            and(
-              eq(services.id, it.id),
-              eq(services.status, 'publicado'),
-              eq(services.mode, 'pago_online'),
-            ),
-          )
-          .limit(1);
-        if (!s || s.price === null) {
-          lines.push({
-            type: it.type,
-            id: it.id,
-            available: false,
-            reason: 'Ya no está disponible',
-          });
-          continue;
-        }
-        lines.push({
-          type: it.type,
-          id: s.id,
-          name: s.name,
-          slug: s.slug,
-          image: s.image,
-          unitPrice: s.price,
-          quantity: it.quantity,
-          stock: null,
-          available: true,
-          lineTotal: s.price * it.quantity,
-          reason: null,
-        });
-      }
-    }
-
-    const ok = lines.filter((l) => l.available);
-    const subtotal = ok.reduce((sum, l) => sum + (l.lineTotal ?? 0), 0);
-    const shipping = computeShipping({
-      subtotal,
-      hasShippableItems: ok.some((l) => l.type === 'product'),
-      flatRate: Number(settings.shipping_flat_rate),
-      freeThreshold:
-        settings.free_shipping_threshold === null ? null : Number(settings.free_shipping_threshold),
-    });
+    const { subtotal, shipping, total } = summarizeCart(lines, settings);
     return c.json({
       lines,
       subtotal,
       shipping,
-      total: subtotal + shipping,
+      total,
       freeShippingThreshold: settings.free_shipping_threshold,
     });
   },

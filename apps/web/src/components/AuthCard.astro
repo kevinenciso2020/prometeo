@@ -1,0 +1,33 @@
+---
+interface Props {
+  title: string;
+  lead?: string;
+}
+const { title, lead } = Astro.props;
+---
+
+<div class="container section">
+  <div class="auth">
+    <h1>{title}</h1>
+    {lead && <p class="lead">{lead}</p>}
+    <slot />
+  </div>
+</div>
+
+<style>
+  .auth {
+    max-width: 28rem;
+    margin-inline: auto;
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: var(--space-6);
+    display: grid;
+    gap: var(--space-4);
+  }
+  h1 {
+    font-size: var(--text-2xl);
+  }
+  .lead {
+    color: var(--color-ink-soft);
+  }
+</style>

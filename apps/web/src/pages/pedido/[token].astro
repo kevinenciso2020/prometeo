@@ -1,0 +1,188 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { formatCop } from '@prometeo/shared';
+import { apiGet, fmtDateTime } from '../../lib/site';
+
+interface OrderView {
+  order: {
+    number: number; code: string; status: string; statusLabel: string; subtotal: number; shippingTotal: number; total: number;
+    trackingNumber: string | null; createdAt: string; paidAt: string | null; name: string; payable: boolean; lastPaymentStatus: string | null;
+    shippingAddress: { departmentName: string; municipalityName: string; address: string; neighborhood: string | null; notes: string | null } | null;
+  };
+  items: { name: string; quantity: number; unitPrice: number; lineTotal: number }[];
+}
+const { token } = Astro.params;
+const res = await apiGet<OrderView>(`/public/orders/${encodeURIComponent(token ?? '')}`);
+if (!res) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+const { order: o, items } = res;
+const steps = ['pendiente_pago', 'pagado', 'preparando', 'enviado', 'entregado'];
+const labels: Record<string, string> = { pendiente_pago: 'Pago', pagado: 'Pagado', preparando: 'Preparando', enviado: 'Enviado', entregado: 'Entregado' };
+const idx = steps.indexOf(o.status);
+const failed = o.payable && ['rechazado', 'error', 'anulado'].includes(o.lastPaymentStatus ?? '');
+---
+
+<BaseLayout title={`Pedido ${o.code}`} noindex cacheable={false} description="Estado de tu pedido">
+  <div class="container section">
+    <p class="eyebrow">Pedido {o.code}</p>
+    <h1>{o.statusLabel}</h1>
+    <p class="muted">Realizado el {fmtDateTime(o.createdAt)} · a nombre de {o.name}</p>
+
+    {
+      o.status === 'cancelado' ? (
+        <p class="banner">Este pedido fue cancelado.</p>
+      ) : (
+        <ol class="steps" aria-label="Progreso del pedido">
+          {steps.map((s, i) => <li class={i <= idx ? 'is-done' : ''} aria-current={i === idx ? 'step' : undefined}>{labels[s]}</li>)}
+        </ol>
+      )
+    }
+
+    {failed && <p class="banner banner--err">Tu último intento de pago no se completó. No se te cobró; puedes intentarlo de nuevo.</p>}
+
+    {
+      o.payable && (
+        <section class="pay" id="pay" data-token={token}>
+          <h2>Pagar este pedido</h2>
+          <p>Paga de forma segura con Wompi: tarjeta, PSE o Nequi.</p>
+          <button class="btn btn--primary" type="button" id="pay-btn">Pagar {formatCop(o.total)}</button>
+          <p class="msg" id="pay-msg" role="alert"></p>
+        </section>
+      )
+    }
+
+    <div class="layout">
+      <div class="card-box">
+        <h2>Productos</h2>
+        <table class="table">
+          <tbody>
+            {items.map((i) => (<tr><td>{i.name} × {i.quantity}</td><td class="num">{formatCop(i.lineTotal)}</td></tr>))}
+            <tr><td>Envío</td><td class="num">{o.shippingTotal === 0 ? 'Gratis' : formatCop(o.shippingTotal)}</td></tr>
+            <tr><td><strong>Total</strong></td><td class="num"><strong>{formatCop(o.total)}</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-box">
+        <h2>Entrega</h2>
+        {
+          o.shippingAddress ? (
+            <p>
+              {o.shippingAddress.address}{o.shippingAddress.neighborhood ? `, ${o.shippingAddress.neighborhood}` : ''}<br />
+              {o.shippingAddress.municipalityName}, {o.shippingAddress.departmentName}
+              {o.shippingAddress.notes && <><br /><em>{o.shippingAddress.notes}</em></>}
+            </p>
+          ) : (
+            <p>Este pedido no requiere envío.</p>
+          )
+        }
+        {o.trackingNumber && <p><strong>Número de guía:</strong> {o.trackingNumber}</p>}
+      </div>
+    </div>
+    <p class="back"><a href="/tienda">← Seguir comprando</a></p>
+  </div>
+
+  <script>
+    import { API_URL } from '../../lib/site';
+    const box = document.getElementById('pay');
+    const msg = document.getElementById('pay-msg');
+    document.getElementById('pay-btn')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      if (!box || !msg) return;
+      btn.disabled = true;
+      msg.textContent = '';
+      try {
+        const res = await fetch(`${API_URL}/public/orders/${box.dataset.token}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const d = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: { message?: string } };
+        if (res.ok && d.checkoutUrl) return void (location.href = d.checkoutUrl);
+        msg.textContent = d.error?.message ?? 'No se pudo iniciar el pago.';
+      } catch {
+        msg.textContent = 'No pudimos conectar con el servidor.';
+      }
+      btn.disabled = false;
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-block: var(--space-2) var(--space-2);
+  }
+  .muted {
+    color: var(--color-ink-mute);
+    margin-bottom: var(--space-5);
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-2);
+    padding: 0;
+    list-style: none;
+    margin-bottom: var(--space-5);
+  }
+  .steps li {
+    padding: var(--space-2);
+    text-align: center;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: var(--border-w) solid var(--color-line-soft);
+    color: var(--color-ink-mute);
+  }
+  .steps li.is-done {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
+    color: var(--color-inverse-ink);
+  }
+  .banner {
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-w) solid var(--color-line);
+    background: var(--color-surface);
+    font-weight: 600;
+    margin-bottom: var(--space-5);
+  }
+  .banner--err {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+  }
+  .pay {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+    margin-bottom: var(--space-5);
+  }
+  .msg {
+    color: var(--color-danger);
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: var(--space-5);
+    align-items: start;
+  }
+  .card-box {
+    border: var(--border-w) solid var(--color-line);
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-3);
+  }
+  .back {
+    margin-top: var(--space-6);
+  }
+  @media (max-width: 800px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .steps {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

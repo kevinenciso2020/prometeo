@@ -1,0 +1,28 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthCard from '../components/AuthCard.astro';
+---
+
+<BaseLayout title="Verificar correo" noindex cacheable={false} description="Verificación de correo">
+  <AuthCard title="Verificando tu correo…">
+    <p id="msg" role="status">Un momento…</p>
+    <p><a class="btn btn--primary" href="/ingresar">Ir a ingresar</a></p>
+  </AuthCard>
+  <script>
+    import { call, errText } from '../lib/account-client';
+    const msg = document.getElementById('msg') as HTMLElement;
+    const token = new URLSearchParams(location.search).get('token');
+    if (!token) msg.textContent = 'El enlace no es válido.';
+    else {
+      call('/auth/verify-email', 'POST', { token })
+        .then(() => {
+          document.querySelector('h1')!.textContent = '¡Correo verificado!';
+          msg.textContent = 'Tu cuenta está activa. Vinculamos tus pedidos e inscripciones anteriores hechos con este correo.';
+        })
+        .catch((e) => {
+          document.querySelector('h1')!.textContent = 'No pudimos verificar el correo';
+          msg.textContent = errText(e);
+        });
+    }
+  </script>
+</BaseLayout>

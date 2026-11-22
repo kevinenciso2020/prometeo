@@ -29,6 +29,7 @@ const steps: Record<string, { title: string; text: string }> = {
 };
 const step = steps[e.status] ?? { title: e.status, text: '' };
 const payable = ['reservada', 'abonada'].includes(e.status) && e.pendingAmount > 0;
+const canDeposit = payable && e.paymentMode === 'abono' && e.paidAmount === 0 && Boolean(edition?.allowedPaymentModes.includes('abono'));
 ---
 
 <BaseLayout title="Mi inscripción" nav="cursos" noindex cacheable={false} description="Estado de tu inscripción">
@@ -50,7 +51,17 @@ const payable = ['reservada', 'abonada'].includes(e.status) && e.pendingAmount >
           {e.balanceDueAt && e.status === 'abonada' && (<Fragment><dt>Saldo antes de</dt><dd>{fmtDateTime(e.balanceDueAt)}</dd></Fragment>)}
         </dl>
         {payable && (
-          <p class="note">El pago en línea con Wompi se habilitará pronto en esta página. Mientras tanto puedes pagar en efectivo o por transferencia coordinando con el taller{wa && <Fragment> por <a href={wa} target="_blank" rel="noopener">WhatsApp</a></Fragment>}; registraremos tu pago y te confirmaremos por correo.</p>
+          <div class="payzone" id="payzone" data-token={token}>
+            <h3>Pagar en línea</h3>
+            <div class="payzone__btns">
+              {canDeposit && <button class="btn btn--primary" type="button" data-type="deposit">Pagar abono de {formatCop(edition?.depositAmount ?? 0)}</button>}
+              <button class={canDeposit ? 'btn' : 'btn btn--primary'} type="button" data-type="full">
+                {e.paidAmount > 0 ? 'Pagar saldo' : 'Pagar total'} {formatCop(e.pendingAmount)}
+              </button>
+            </div>
+            <p class="msg" id="pay-msg" role="alert"></p>
+            <p class="note">Pagas de forma segura con Wompi (tarjeta, PSE o Nequi). También puedes pagar en efectivo o por transferencia coordinando con el taller{wa && <Fragment> por <a href={wa} target="_blank" rel="noopener">WhatsApp</a></Fragment>}; registraremos tu pago y te confirmaremos por correo.</p>
+          </div>
         )}
       </div>
 
@@ -87,6 +98,29 @@ const payable = ['reservada', 'abonada'].includes(e.status) && e.pendingAmount >
 
   <script>
     import { API_URL } from '../../lib/site';
+    const zone = document.getElementById('payzone');
+    const payMsg = document.getElementById('pay-msg');
+    zone?.querySelectorAll<HTMLButtonElement>('button[data-type]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!payMsg) return;
+        payMsg.textContent = '';
+        btn.disabled = true;
+        try {
+          const res = await fetch(`${API_URL}/public/enrollments/${zone.dataset.token}/pay`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: btn.dataset.type }),
+          });
+          const d = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: { message?: string } };
+          if (res.ok && d.checkoutUrl) return void (location.href = d.checkoutUrl);
+          payMsg.textContent = d.error?.message ?? 'No se pudo iniciar el pago.';
+        } catch {
+          payMsg.textContent = 'No pudimos conectar con el servidor.';
+        }
+        btn.disabled = false;
+      });
+    });
+
     const box = document.getElementById('secure');
     const msg = document.getElementById('secure-msg');
     box?.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((btn) => {
@@ -153,6 +187,16 @@ const payable = ['reservada', 'abonada'].includes(e.status) && e.pendingAmount >
     display: grid;
     gap: var(--space-2);
     font-size: var(--text-sm);
+  }
+  .payzone {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+  .payzone__btns {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
   }
   .note {
     font-size: var(--text-sm);

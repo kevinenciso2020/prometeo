@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthCard from '../components/AuthCard.astro';
+---
+
+<BaseLayout title="Crear cuenta" noindex cacheable={false} description="Crea tu cuenta de Prometeo">
+  <AuthCard title="Crear cuenta" lead="Con tu cuenta ves el historial de tus pedidos e inscripciones. Si ya compraste como invitado con este correo, los vinculamos al verificarlo.">
+    <form id="form" class="stack" novalidate>
+      <div class="field"><label for="name">Nombre completo</label><input class="input" id="name" name="name" autocomplete="name" required /></div>
+      <div class="field"><label for="email">Correo electrónico</label><input class="input" id="email" name="email" type="email" autocomplete="email" required /></div>
+      <div class="field"><label for="phone">Teléfono (opcional)</label><input class="input" id="phone" name="phone" type="tel" autocomplete="tel" /></div>
+      <div class="field"><label for="password">Contraseña</label><input class="input" id="password" name="password" type="password" minlength="10" autocomplete="new-password" required /><span class="hint">Mínimo 10 caracteres.</span></div>
+      <label class="check"><input type="checkbox" name="acceptDataPolicy" required /><span>Autorizo el tratamiento de mis datos personales según la <a href="/privacidad">política de privacidad</a> (Ley 1581 de 2012).</span></label>
+      <p class="form-error" id="msg" role="alert"></p>
+      <button class="btn btn--primary" type="submit">Crear cuenta</button>
+    </form>
+    <p>¿Ya tienes cuenta? <a href="/ingresar">Ingresar</a></p>
+  </AuthCard>
+  <script>
+    import { call, errText } from '../lib/account-client';
+    const form = document.getElementById('form') as HTMLFormElement;
+    const msg = document.getElementById('msg') as HTMLElement;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'form-error';
+      msg.textContent = '';
+      const d = new FormData(form);
+      try {
+        await call('/auth/register', 'POST', {
+          name: String(d.get('name') ?? ''),
+          email: String(d.get('email') ?? ''),
+          phone: String(d.get('phone') ?? '') || undefined,
+          password: String(d.get('password') ?? ''),
+          acceptDataPolicy: d.get('acceptDataPolicy') === 'on',
+        });
+        form.reset();
+        msg.style.color = 'var(--color-success)';
+        msg.textContent = 'Listo. Si el correo es válido, te enviamos un enlace para verificarlo.';
+      } catch (err) {
+        msg.style.color = '';
+        msg.textContent = errText(err);
+      }
+    });
+  </script>
+</BaseLayout>

@@ -10,11 +10,13 @@ const { title, active = '' } = Astro.props;
 const user = Astro.locals.user;
 const links = [
   { href: '/admin', key: 'panel', label: 'Panel' },
+  { href: '/admin/pedidos', key: 'pedidos', label: 'Pedidos' },
   { href: '/admin/productos', key: 'productos', label: 'Productos' },
   { href: '/admin/categorias', key: 'categorias', label: 'Categorías' },
   { href: '/admin/cursos', key: 'cursos', label: 'Cursos' },
   { href: '/admin/ediciones', key: 'ediciones', label: 'Ediciones' },
   { href: '/admin/servicios', key: 'servicios', label: 'Servicios' },
+  { href: '/admin/cotizaciones', key: 'cotizaciones', label: 'Cotizaciones' },
   { href: '/admin/ajustes', key: 'ajustes', label: 'Ajustes' },
   ...(user?.role === 'SUPER_ADMIN' ? [{ href: '/admin/administradores', key: 'administradores', label: 'Administradores' }] : []),
 ];

@@ -21,6 +21,9 @@ export const env: Bindings = {
   CLOUDINARY_CLOUD_NAME: 'democloud',
   CLOUDINARY_API_KEY: '111222333',
   CLOUDINARY_API_SECRET: 'secreto-cloudinary',
+  WOMPI_PUBLIC_KEY: 'pub_test_abc123',
+  WOMPI_INTEGRITY_SECRET: 'test_integrity_secret',
+  WOMPI_EVENTS_SECRET: 'test_events_secret',
 };
 
 const migrationsFolder = fileURLToPath(

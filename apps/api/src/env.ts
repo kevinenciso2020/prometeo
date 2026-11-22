@@ -11,6 +11,8 @@ export interface Bindings {
   RESEND_API_KEY?: string;
   CLOUDINARY_API_KEY: string;
   CLOUDINARY_API_SECRET: string;
+  WOMPI_INTEGRITY_SECRET: string;
+  WOMPI_EVENTS_SECRET: string;
   // Variables
   ENVIRONMENT: 'development' | 'production' | 'test';
   WEB_ORIGIN: string;
@@ -18,9 +20,12 @@ export interface Bindings {
   EMAIL_FROM: string;
   COOKIE_DOMAIN?: string;
   CLOUDINARY_CLOUD_NAME: string;
+  /** Llave pública de Wompi (pub_test_… en sandbox, pub_prod_… en producción). No es secreta. */
+  WOMPI_PUBLIC_KEY: string;
   // Rate limiting
   RL_AUTH?: RateLimit;
   RL_PUBLIC?: RateLimit;
+  RL_WEBHOOK?: RateLimit;
 }
 
 export interface AuthUser {

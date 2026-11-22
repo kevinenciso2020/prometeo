@@ -13,3 +13,9 @@ JWT_SECRET="cambia-esto-por-un-secreto-largo-y-aleatorio"
 # Cloudinary (Dashboard > API Keys). El API_SECRET NUNCA llega al navegador.
 CLOUDINARY_API_KEY="123456789012345"
 CLOUDINARY_API_SECRET="tu-api-secret"
+
+# Wompi (Dashboard > Desarrolladores > Secretos para integración técnica). Usa las llaves de SANDBOX en local.
+# La llave pública va en wrangler.toml ([vars] WOMPI_PUBLIC_KEY). Estos dos son secretos:
+WOMPI_INTEGRITY_SECRET="test_integrity_xxxxxxxxxxxxxxxx"
+WOMPI_EVENTS_SECRET="test_events_xxxxxxxxxxxxxxxx"
+# URL de eventos a configurar en Wompi: https://api.<dominio>/webhooks/wompi

@@ -8,3 +8,7 @@ export * from './shipping';
 export * from './schemas/public';
 export * from './enrollment';
 export * from './schemas/courses';
+export * from './divipola';
+export * from './wompi';
+export * from './orders';
+export * from './schemas/checkout';

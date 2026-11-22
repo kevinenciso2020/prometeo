@@ -6,7 +6,6 @@ import {
   courses,
   editionSessions,
   enrollments,
-  guestLinks,
   users,
 } from '@prometeo/db';
 import {
@@ -15,7 +14,6 @@ import {
   createEnrollmentSchema,
   pendingAmount,
   secureSeatSchema,
-  sha256Hex,
   slugParamSchema,
   tokenParamSchema,
 } from '@prometeo/shared';
@@ -25,6 +23,7 @@ import { optionalUser } from '../lib/optional-user';
 import { validate } from '../lib/validate';
 import { rateLimit } from '../middleware/rate-limit';
 import { AuthError } from '../services/auth.service';
+import { resolveGuestLink } from '../services/guest-links';
 import {
   createEnrollment,
   emailContext,
@@ -151,23 +150,9 @@ publicCoursesRoutes.post(
 
 async function enrollmentByToken(c: Context<AppEnv>, token: string) {
   const db = c.get('db');
-  const [link] = await db
-    .select()
-    .from(guestLinks)
-    .where(
-      and(
-        eq(guestLinks.tokenHash, await sha256Hex(token)),
-        eq(guestLinks.subjectType, 'enrollment'),
-        sql`${guestLinks.expiresAt} > now()`,
-      ),
-    )
-    .limit(1);
-  if (!link) throw new AuthError(404, 'NOT_FOUND', 'El enlace no es válido o venció');
-  const [enrollment] = await db
-    .select()
-    .from(enrollments)
-    .where(eq(enrollments.id, link.subjectId))
-    .limit(1);
+  const id = await resolveGuestLink(db, 'enrollment', token);
+  if (!id) throw new AuthError(404, 'NOT_FOUND', 'El enlace no es válido o venció');
+  const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, id)).limit(1);
   if (!enrollment) throw new AuthError(404, 'NOT_FOUND', 'Inscripción no encontrada');
   return enrollment;
 }

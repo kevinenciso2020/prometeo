@@ -1,5 +1,5 @@
 import { and, eq, inArray, lte, sql } from 'drizzle-orm';
-import { courseEditions, editionSessions, enrollments, type Db } from '@prometeo/db';
+import { courseEditions, editionSessions, enrollments, orders, type Db } from '@prometeo/db';
 import type { Mailer } from '../lib/mailer';
 import { tomorrowRangeBogota } from '../lib/dates';
 import * as mail from '../lib/enrollment-emails';
@@ -189,6 +189,23 @@ export async function finalizeEditions(db: Db, now = new Date()): Promise<number
   return Array.isArray(rows) ? rows.length : 0;
 }
 
+/** Diario: cancela pedidos sin pago aprobado tras N días (por defecto 7). Idempotente. */
+export async function cancelStaleOrders(db: Db, now = new Date(), days = 7): Promise<number> {
+  const cutoff = new Date(now.getTime() - days * 24 * HOUR);
+  const rows = await db
+    .update(orders)
+    .set({ status: 'cancelado' })
+    .where(
+      and(
+        eq(orders.status, 'pendiente_pago'),
+        lte(orders.createdAt, cutoff),
+        sql`not exists (select 1 from payments p where p.order_id = ${orders.id} and p.status = 'aprobado')`,
+      ),
+    )
+    .returning({ id: orders.id });
+  return rows.length;
+}
+
 /** Diario: recordatorio de las clases del día siguiente (Bogotá), una vez por sesión. */
 export async function sendCourseReminders(deps: CronDeps, now = new Date()): Promise<number> {
   const handle = deps.open();
@@ -265,6 +282,7 @@ export async function runCron(cron: string, deps: CronDeps, now = new Date()): P
       const h = deps.open();
       try {
         log(`[cron] ediciones finalizadas=${await finalizeEditions(h.db, now)}`);
+        log(`[cron] pedidos sin pago cancelados=${await cancelStaleOrders(h.db, now)}`);
       } finally {
         await h.close();
       }

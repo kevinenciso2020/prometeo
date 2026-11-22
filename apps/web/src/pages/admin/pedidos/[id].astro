@@ -1,0 +1,86 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Pedido" active="pedidos">
+  <div class="page-head">
+    <h1 id="title">Pedido</h1>
+    <div class="actions"><a class="btn" href="/admin/pedidos">Volver</a></div>
+  </div>
+  <div id="review" class="card" hidden style="border-color: var(--color-danger); margin-bottom: var(--space-5)">
+    <h2>Requiere revisión</h2>
+    <p id="review-text"></p>
+    <div class="actions" style="justify-content:flex-start">
+      <button class="btn btn--primary" id="deduct" type="button">Descontar stock y resolver</button>
+      <button class="btn" id="nodeduct" type="button">Resolver sin descontar</button>
+    </div>
+  </div>
+  <div class="grid-2" id="main" data-id={id}>
+    <div class="card stack">
+      <h2>Estado</h2>
+      <p><span class="badge badge--solid" id="status"></span> <span id="tracking"></span></p>
+      <div class="actions" id="actions" style="justify-content:flex-start;flex-wrap:wrap"></div>
+    </div>
+    <div class="card stack"><h2>Cliente y entrega</h2><div id="customer"></div></div>
+  </div>
+  <div class="card stack" style="margin-top:var(--space-5)"><h2>Productos</h2><div class="table-wrap"><table class="table"><tbody id="items"></tbody></table></div></div>
+  <div class="card stack" style="margin-top:var(--space-5)"><h2>Pagos</h2><div class="table-wrap"><table class="table"><thead><tr><th>Referencia</th><th>Estado</th><th>Wompi</th><th class="num">Monto</th><th>Nota</th></tr></thead><tbody id="pays"></tbody></table></div></div>
+
+  <script>
+    import { $, api, errorMessage, esc, fmtBogota, formatCop, toast } from '../../../lib/admin-client';
+    interface Order {
+      id: string; code: string; status: string; statusLabel: string; nextStatuses: string[]; needsReview: boolean; stockDeducted: boolean; trackingNumber: string | null;
+      contactName: string; contactEmail: string; contactPhone: string; contactDocument: string | null; subtotal: number; shippingTotal: number; total: number; paidAt: string | null;
+      shippingAddress: { departmentName: string; municipalityName: string; address: string; neighborhood: string | null; notes: string | null } | null;
+      items: { nameSnapshot: string; quantity: number; unitPrice: number; lineTotal: number }[];
+      payments: { reference: string; status: string; wompiTransactionId: string | null; amount: number; note: string | null; createdAt: string }[];
+    }
+    const id = $('#main').dataset.id ?? '';
+    const LABEL: Record<string, string> = { preparando: 'Marcar como preparando', enviado: 'Marcar como enviado', entregado: 'Marcar como entregado', cancelado: 'Cancelar pedido' };
+
+    async function load() {
+      const { item: o } = await api<{ item: Order }>(`/admin/orders/${id}`);
+      $('#title').textContent = `Pedido ${o.code}`;
+      $('#status').textContent = o.statusLabel;
+      $('#tracking').textContent = o.trackingNumber ? `Guía: ${o.trackingNumber}` : '';
+      $('#actions').replaceChildren(...o.nextStatuses.map((s) => {
+        const b = document.createElement('button');
+        b.className = s === 'cancelado' ? 'btn btn--sm btn--danger' : 'btn btn--sm btn--primary';
+        b.type = 'button';
+        b.textContent = LABEL[s] ?? s;
+        b.addEventListener('click', () => void change(s, o));
+        return b;
+      }));
+      if (o.nextStatuses.length === 0) $('#actions').textContent = 'Sin acciones disponibles.';
+      const a = o.shippingAddress;
+      $('#customer').innerHTML = `<p><strong>${esc(o.contactName)}</strong><br>${esc(o.contactEmail)} · ${esc(o.contactPhone)}${o.contactDocument ? `<br>Doc: ${esc(o.contactDocument)}` : ''}</p>
+        <p>${a ? `${esc(a.address)}${a.neighborhood ? ', ' + esc(a.neighborhood) : ''}<br>${esc(a.municipalityName)}, ${esc(a.departmentName)}${a.notes ? `<br><em>${esc(a.notes)}</em>` : ''}` : 'Sin envío (servicio).'}</p>`;
+      $('#items').innerHTML = o.items.map((i) => `<tr><td>${esc(i.nameSnapshot)} × ${i.quantity}</td><td class="num">${formatCop(i.lineTotal)}</td></tr>`).join('')
+        + `<tr><td>Envío</td><td class="num">${formatCop(o.shippingTotal)}</td></tr><tr><td><strong>Total</strong></td><td class="num"><strong>${formatCop(o.total)}</strong></td></tr>`;
+      $('#pays').innerHTML = o.payments.map((p) => `<tr><td>${esc(p.reference)}<br><small>${fmtBogota(p.createdAt)}</small></td><td><span class="badge">${esc(p.status)}</span></td><td>${esc(p.wompiTransactionId ?? '—')}</td><td class="num">${formatCop(p.amount)}</td><td>${esc(p.note ?? '')}</td></tr>`).join('');
+      $('#review').hidden = !o.needsReview;
+      $('#review-text').textContent = 'El pago se aprobó pero hubo una inconsistencia (por ejemplo, no había stock suficiente al confirmar, o el pedido no era pagable). Revisa los pagos y decide.';
+    }
+
+    async function change(status: string, o: Order) {
+      let trackingNumber: string | null = null;
+      if (status === 'enviado') {
+        trackingNumber = prompt('Número de guía del envío:')?.trim() ?? '';
+        if (!trackingNumber) return;
+      }
+      if (status === 'cancelado' && !confirm(o.stockDeducted ? '¿Cancelar el pedido? Se repondrá el stock descontado.' : '¿Cancelar el pedido?')) return;
+      try {
+        await api(`/admin/orders/${id}/status`, 'PATCH', { status, trackingNumber });
+        toast('Estado actualizado');
+        await load();
+      } catch (err) { toast(errorMessage(err), 'error'); }
+    }
+    async function resolve(deductStock: boolean) {
+      try { await api(`/admin/orders/${id}/resolve-review`, 'POST', { deductStock }); toast('Pedido resuelto'); await load(); } catch (err) { toast(errorMessage(err), 'error'); }
+    }
+    $('#deduct').addEventListener('click', () => void resolve(true));
+    $('#nodeduct').addEventListener('click', () => void resolve(false));
+    void load().catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

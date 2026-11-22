@@ -4,7 +4,6 @@ import {
   courses,
   editionSessions,
   enrollments,
-  guestLinks,
   payments,
   type Db,
 } from '@prometeo/db';
@@ -16,8 +15,6 @@ import {
   editionStatusForSeats,
   eventForPayment,
   isEditionOpen,
-  randomToken,
-  sha256Hex,
   transition,
   type CreateEnrollmentInput,
   type EditionStatus,
@@ -30,11 +27,10 @@ import * as mail from '../lib/enrollment-emails';
 import type { Mailer } from '../lib/mailer';
 import { withTransaction, type PoolOpener } from '../lib/tx';
 import { AuthError } from './auth.service';
+import { issueGuestLink, resolveGuestLink } from './guest-links';
 
 type Enrollment = typeof enrollments.$inferSelect;
 type Edition = typeof courseEditions.$inferSelect;
-
-export const GUEST_LINK_TTL_MS = 180 * 24 * 3_600_000;
 
 const err = (status: 400 | 401 | 403 | 404 | 409, code: string, message: string) =>
   new AuthError(status as 400, code, message);
@@ -73,17 +69,8 @@ export async function syncEditionStatus(tx: Db, edition: Edition): Promise<numbe
   return Math.max(0, edition.maxSeats - occupied);
 }
 
-async function issueGuestLink(db: Db, enrollmentId: string, email: string): Promise<string> {
-  const token = randomToken(32);
-  await db.insert(guestLinks).values({
-    tokenHash: await sha256Hex(token),
-    subjectType: 'enrollment',
-    subjectId: enrollmentId,
-    email,
-    expiresAt: new Date(Date.now() + GUEST_LINK_TTL_MS),
-  });
-  return token;
-}
+const issueEnrollmentLink = (db: Db, enrollmentId: string, email: string) =>
+  issueGuestLink(db, 'enrollment', enrollmentId, email);
 
 /* ------------------------------------------------------------------ */
 /* Contexto para correos                                               */
@@ -111,7 +98,8 @@ export async function emailContext(
     .where(eq(editionSessions.editionId, enrollment.editionId))
     .orderBy(asc(editionSessions.startsAt))
     .limit(1);
-  const token = statusToken ?? (await issueGuestLink(db, enrollment.id, enrollment.contactEmail));
+  const token =
+    statusToken ?? (await issueEnrollmentLink(db, enrollment.id, enrollment.contactEmail));
   return {
     to: enrollment.contactEmail,
     name: enrollment.contactName,
@@ -217,7 +205,7 @@ export async function createEnrollment(
     if (!enrollment) throw new Error('No se pudo crear la inscripción');
 
     const seatsLeft = await syncEditionStatus(tx, edition);
-    const token = await issueGuestLink(tx, enrollment.id, enrollment.contactEmail);
+    const token = await issueEnrollmentLink(tx, enrollment.id, enrollment.contactEmail);
     return {
       enrollment,
       token,
@@ -235,22 +223,12 @@ export async function secureSeat(
   now = new Date(),
 ): Promise<Enrollment> {
   return withTransaction(open, async (tx) => {
-    const [link] = await tx
-      .select()
-      .from(guestLinks)
-      .where(
-        and(
-          eq(guestLinks.tokenHash, await sha256Hex(token)),
-          eq(guestLinks.subjectType, 'enrollment'),
-          sql`${guestLinks.expiresAt} > now()`,
-        ),
-      )
-      .limit(1);
-    if (!link) throw err(404, 'NOT_FOUND', 'El enlace no es válido o venció');
+    const subjectId = await resolveGuestLink(tx, 'enrollment', token);
+    if (!subjectId) throw err(404, 'NOT_FOUND', 'El enlace no es válido o venció');
     const [pre] = await tx
       .select({ editionId: enrollments.editionId })
       .from(enrollments)
-      .where(eq(enrollments.id, link.subjectId))
+      .where(eq(enrollments.id, subjectId))
       .limit(1);
     if (!pre) throw err(404, 'NOT_FOUND', 'Inscripción no encontrada');
 
@@ -258,7 +236,7 @@ export async function secureSeat(
     const [current] = await tx
       .select()
       .from(enrollments)
-      .where(eq(enrollments.id, link.subjectId))
+      .where(eq(enrollments.id, subjectId))
       .for('update');
     if (!current) throw err(404, 'NOT_FOUND', 'Inscripción no encontrada');
     const next = transition(current.status as EnrollmentState, 'reserve');

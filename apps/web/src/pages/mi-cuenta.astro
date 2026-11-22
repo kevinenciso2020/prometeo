@@ -1,0 +1,123 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Mi cuenta" noindex cacheable={false} description="Tu cuenta en Prometeo">
+  <div class="container section">
+    <div class="head">
+      <div><p class="eyebrow" id="who">Mi cuenta</p><h1>Mis compras e inscripciones</h1></div>
+      <button class="btn btn--sm" id="logout" type="button" hidden>Cerrar sesión</button>
+    </div>
+    <p id="state" role="status">Cargando…</p>
+    <div id="content" hidden>
+      <section>
+        <h2>Pedidos</h2>
+        <div class="table-wrap"><table class="table"><thead><tr><th>Pedido</th><th>Fecha</th><th>Estado</th><th class="num">Total</th><th></th></tr></thead><tbody id="orders"></tbody></table></div>
+      </section>
+      <section>
+        <h2>Inscripciones</h2>
+        <div class="table-wrap"><table class="table"><thead><tr><th>Curso</th><th>Inicio</th><th>Estado</th><th class="num">Pagado</th><th></th></tr></thead><tbody id="enr"></tbody></table></div>
+      </section>
+    </div>
+  </div>
+  <script>
+    import { formatCop } from '@prometeo/shared';
+    import { call, errText } from '../lib/account-client';
+    interface Summary {
+      orders: { id: string; code: string; statusLabel: string; total: number; createdAt: string }[];
+      enrollments: { id: string; status: string; courseName: string; firstStart: string | null; totalAmount: number; paidAmount: number }[];
+    }
+    const state = document.getElementById('state') as HTMLElement;
+    const content = document.getElementById('content') as HTMLElement;
+    const fmt = (v: string | null) => (v ? new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeZone: 'America/Bogota' }).format(new Date(v)) : '—');
+
+    function cell(text: string, cls?: string) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      if (cls) td.className = cls;
+      return td;
+    }
+    function row(cells: HTMLElement[], type: 'order' | 'enrollment', id: string, msg: string) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      const b = document.createElement('button');
+      b.className = 'btn btn--sm';
+      b.type = 'button';
+      b.textContent = 'Ver';
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        try {
+          const r = await call<{ token: string }>('/account/links', 'POST', { type, id }, { redirectOn401: '/mi-cuenta' });
+          location.href = `/${type === 'order' ? 'pedido' : 'inscripcion'}/${r.token}`;
+        } catch (e) {
+          state.hidden = false;
+          state.textContent = `${msg}: ${errText(e)}`;
+          b.disabled = false;
+        }
+      });
+      td.append(b);
+      tr.append(...cells, td);
+      return tr;
+    }
+    function empty(cols: number, text: string) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = cols;
+      td.className = 'empty';
+      td.textContent = text;
+      tr.append(td);
+      return tr;
+    }
+
+    async function load() {
+      try {
+        const me = await call<{ user: { name: string; email: string } }>('/auth/me', 'GET', undefined, { redirectOn401: '/mi-cuenta' });
+        (document.getElementById('who') as HTMLElement).textContent = `${me.user.name} · ${me.user.email}`;
+        (document.getElementById('logout') as HTMLElement).hidden = false;
+        const s = await call<Summary>('/account/summary', 'GET', undefined, { redirectOn401: '/mi-cuenta' });
+        (document.getElementById('orders') as HTMLElement).replaceChildren(
+          ...(s.orders.length
+            ? s.orders.map((o) => row([cell(o.code), cell(fmt(o.createdAt)), cell(o.statusLabel), cell(formatCop(o.total), 'num')], 'order', o.id, 'No se pudo abrir el pedido'))
+            : [empty(5, 'Aún no tienes pedidos')]),
+        );
+        (document.getElementById('enr') as HTMLElement).replaceChildren(
+          ...(s.enrollments.length
+            ? s.enrollments.map((e) => row([cell(e.courseName), cell(fmt(e.firstStart)), cell(e.status), cell(`${formatCop(e.paidAmount)} / ${formatCop(e.totalAmount)}`, 'num')], 'enrollment', e.id, 'No se pudo abrir la inscripción'))
+            : [empty(5, 'Aún no tienes inscripciones')]),
+        );
+        state.hidden = true;
+        content.hidden = false;
+      } catch (e) {
+        state.textContent = errText(e);
+      }
+    }
+    document.getElementById('logout')?.addEventListener('click', async () => {
+      try {
+        await call('/auth/logout', 'POST', {});
+      } finally {
+        location.href = '/';
+      }
+    });
+    void load();
+  </script>
+</BaseLayout>
+
+<style>
+  .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-5);
+  }
+  h1 {
+    font-size: var(--text-2xl);
+  }
+  section {
+    margin-top: var(--space-6);
+  }
+  section h2 {
+    margin-bottom: var(--space-3);
+  }
+</style>

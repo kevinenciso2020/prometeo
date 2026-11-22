@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import type { AppEnv, Bindings } from '../env';
 
-type LimiterName = 'RL_AUTH' | 'RL_PUBLIC';
+type LimiterName = 'RL_AUTH' | 'RL_PUBLIC' | 'RL_WEBHOOK';
 
 // Respaldo en memoria solo para desarrollo/tests (por isolate; en producción se usa el binding).
 const hits = new Map<string, { count: number; resetAt: number }>();

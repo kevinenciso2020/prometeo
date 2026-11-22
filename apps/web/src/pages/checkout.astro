@@ -1,0 +1,246 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { DEPARTMENTS } from '@prometeo/shared';
+---
+
+<BaseLayout title="Finalizar compra" description="Completa tus datos para pagar tu pedido." noindex cacheable={false}>
+  <div class="container section">
+    <h1>Finalizar compra</h1>
+    <p id="state" role="status">Cargando tu pedido…</p>
+    <div class="layout" id="wrap" hidden>
+      <form id="form" novalidate>
+        <fieldset>
+          <legend>Tus datos</legend>
+          <div class="grid-2">
+            <div class="field"><label for="name">Nombre completo</label><input class="input" id="name" name="name" autocomplete="name" required /></div>
+            <div class="field"><label for="email">Correo electrónico</label><input class="input" id="email" name="email" type="email" autocomplete="email" required /></div>
+            <div class="field"><label for="phone">Teléfono / WhatsApp</label><input class="input" id="phone" name="phone" type="tel" autocomplete="tel" required /></div>
+            <div class="field"><label for="document">Documento (opcional)</label><input class="input" id="document" name="document" /></div>
+          </div>
+        </fieldset>
+
+        <fieldset id="shipping">
+          <legend>Dirección de envío</legend>
+          <div class="grid-2">
+            <div class="field">
+              <label for="dep">Departamento</label>
+              <select class="select" id="dep" name="departmentCode" required>
+                <option value="">Selecciona…</option>
+                {DEPARTMENTS.map((d) => <option value={d.code}>{d.name}</option>)}
+              </select>
+            </div>
+            <div class="field"><label for="mun">Municipio</label><select class="select" id="mun" name="municipalityCode" required disabled><option value="">Primero elige el departamento</option></select></div>
+            <div class="field"><label for="address">Dirección</label><input class="input" id="address" name="address" autocomplete="street-address" required /></div>
+            <div class="field"><label for="neighborhood">Barrio / Apto / Conjunto</label><input class="input" id="neighborhood" name="neighborhood" /></div>
+          </div>
+          <div class="field"><label for="notes">Indicaciones para la entrega</label><input class="input" id="notes" name="notes" /></div>
+        </fieldset>
+
+        <div class="hp" aria-hidden="true"><label>Sitio web<input name="website" tabindex="-1" autocomplete="off" /></label></div>
+        <label class="check"><input type="checkbox" name="acceptDataPolicy" required /><span>Autorizo el tratamiento de mis datos personales según la <a href="/privacidad">política de privacidad</a> (Ley 1581 de 2012).</span></label>
+        <label class="check"><input type="checkbox" name="acceptTerms" required /><span>Acepto los <a href="/terminos">términos y condiciones</a> y la <a href="/envios-y-devoluciones">política de envíos, devoluciones y derecho de retracto</a> (Ley 1480 de 2011).</span></label>
+        <p class="msg" id="msg" role="alert"></p>
+        <button class="btn btn--primary" type="submit" id="pay">Ir a pagar con Wompi</button>
+        <p class="hint">Serás redirigido a Wompi para pagar con tarjeta, PSE o Nequi. Tu pedido se confirma cuando se aprueba el pago.</p>
+      </form>
+
+      <aside class="summary" aria-label="Resumen del pedido">
+        <h2>Tu pedido</h2>
+        <ul id="lines" role="list"></ul>
+        <dl>
+          <dt>Subtotal</dt><dd id="subtotal"></dd>
+          <dt>Envío</dt><dd id="shippingCost"></dd>
+          <dt class="total">Total</dt><dd class="total" id="total"></dd>
+        </dl>
+        <a href="/carrito" class="link-arrow">← Editar carrito</a>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    import { formatCop, getMunicipalities } from '@prometeo/shared';
+    import { API_URL } from '../lib/site';
+    import { clearCart, readCart } from '../lib/cart';
+
+    interface Line { type: 'product' | 'service'; id: string; name?: string; quantity?: number; available: boolean; lineTotal?: number; reason?: string | null }
+    interface Quote { lines: Line[]; subtotal: number; shipping: number; total: number }
+
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const form = $<HTMLFormElement>('form');
+    const msg = $('msg');
+    let items = readCart();
+    let hasProducts = false;
+
+    const dep = $<HTMLSelectElement>('dep');
+    const mun = $<HTMLSelectElement>('mun');
+    dep.addEventListener('change', () => {
+      const list = getMunicipalities(dep.value);
+      mun.replaceChildren(new Option(list.length ? 'Selecciona…' : 'Primero elige el departamento', ''), ...list.map((m) => new Option(m.name, m.code)));
+      mun.disabled = list.length === 0;
+    });
+
+    async function load() {
+      if (items.length === 0) {
+        $('state').innerHTML = 'Tu carrito está vacío. <a href="/tienda">Ir a la tienda</a>';
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/public/cart/quote`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+        if (!res.ok) throw new Error('quote');
+        const q = (await res.json()) as Quote;
+        const bad = q.lines.filter((l) => !l.available);
+        if (bad.length > 0) {
+          $('state').innerHTML = `Algunos productos ya no están disponibles (${bad.map((b) => b.reason).join(', ')}). <a href="/carrito">Revisa tu carrito</a>.`;
+          return;
+        }
+        hasProducts = q.lines.some((l) => l.type === 'product');
+        $('shipping').hidden = !hasProducts;
+        dep.required = mun.required = hasProducts;
+        $<HTMLInputElement>('address').required = hasProducts;
+        $('lines').replaceChildren(
+          ...q.lines.map((l) => {
+            const li = document.createElement('li');
+            const a = document.createElement('span');
+            a.textContent = `${l.name ?? ''} × ${l.quantity ?? 1}`;
+            const b = document.createElement('strong');
+            b.textContent = formatCop(l.lineTotal ?? 0);
+            li.append(a, b);
+            return li;
+          }),
+        );
+        $('subtotal').textContent = formatCop(q.subtotal);
+        $('shippingCost').textContent = hasProducts ? (q.shipping === 0 ? 'Gratis' : formatCop(q.shipping)) : 'No aplica';
+        $('total').textContent = formatCop(q.total);
+        $('state').hidden = true;
+        $('wrap').hidden = false;
+      } catch {
+        $('state').textContent = 'No pudimos cargar tu pedido. Intenta de nuevo en unos minutos.';
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      const d = new FormData(form);
+      const btn = $<HTMLButtonElement>('pay');
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_URL}/public/checkout/order`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items,
+            name: String(d.get('name') ?? ''),
+            email: String(d.get('email') ?? ''),
+            phone: String(d.get('phone') ?? ''),
+            document: String(d.get('document') ?? ''),
+            shipping: hasProducts
+              ? { departmentCode: String(d.get('departmentCode') ?? ''), municipalityCode: String(d.get('municipalityCode') ?? ''), address: String(d.get('address') ?? ''), neighborhood: String(d.get('neighborhood') ?? ''), notes: String(d.get('notes') ?? '') }
+              : null,
+            acceptDataPolicy: d.get('acceptDataPolicy') === 'on',
+            acceptTerms: d.get('acceptTerms') === 'on',
+            website: String(d.get('website') ?? ''),
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: { message?: string; fields?: { message: string }[] } };
+        if (res.ok && data.checkoutUrl) {
+          clearCart(); // el pedido ya existe y se puede pagar desde su enlace
+          location.href = data.checkoutUrl;
+          return;
+        }
+        msg.textContent = data.error?.fields?.map((f) => f.message).join(' · ') ?? data.error?.message ?? 'No se pudo crear el pedido.';
+      } catch {
+        msg.textContent = 'No pudimos conectar con el servidor. Intenta de nuevo.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    void load();
+  </script>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-bottom: var(--space-5);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 22rem;
+    gap: var(--space-7);
+    align-items: start;
+  }
+  form {
+    display: grid;
+    gap: var(--space-5);
+  }
+  fieldset {
+    border: var(--border-w) solid var(--color-line);
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-4);
+  }
+  legend {
+    font-weight: 600;
+    padding-inline: var(--space-2);
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+  }
+  .msg {
+    color: var(--color-danger);
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .hint {
+    font-size: var(--text-xs);
+    color: var(--color-ink-mute);
+  }
+  .summary {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-3);
+    position: sticky;
+    top: 6rem;
+  }
+  ul {
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+  }
+  ul :global(li) {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  dl {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-2);
+    margin: 0;
+  }
+  dd {
+    margin: 0;
+    text-align: right;
+  }
+  .total {
+    font-weight: 700;
+    font-size: var(--text-lg);
+    border-top: 1px solid var(--color-line);
+    padding-top: var(--space-2);
+  }
+  @media (max-width: 800px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .summary {
+      position: static;
+      order: -1;
+    }
+  }
+</style>

@@ -1,0 +1,30 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthCard from '../components/AuthCard.astro';
+---
+
+<BaseLayout title="Nueva contraseña" noindex cacheable={false} description="Elige una nueva contraseña">
+  <AuthCard title="Nueva contraseña">
+    <form id="form" class="stack" novalidate>
+      <div class="field"><label for="password">Nueva contraseña</label><input class="input" id="password" name="password" type="password" minlength="10" autocomplete="new-password" required /><span class="hint">Mínimo 10 caracteres.</span></div>
+      <p class="form-error" id="msg" role="alert"></p>
+      <button class="btn btn--primary" type="submit">Cambiar contraseña</button>
+    </form>
+  </AuthCard>
+  <script>
+    import { call, errText } from '../lib/account-client';
+    const form = document.getElementById('form') as HTMLFormElement;
+    const msg = document.getElementById('msg') as HTMLElement;
+    const token = new URLSearchParams(location.search).get('token') ?? '';
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      try {
+        await call('/auth/reset-password', 'POST', { token, password: String(new FormData(form).get('password') ?? '') });
+        location.href = '/ingresar';
+      } catch (err) {
+        msg.textContent = errText(err);
+      }
+    });
+  </script>
+</BaseLayout>

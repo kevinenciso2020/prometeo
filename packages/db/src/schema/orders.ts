@@ -47,6 +47,8 @@ export const orders = pgTable(
     trackingNumber: varchar('tracking_number', { length: 80 }),
     /** Pagado pero sin stock al confirmar: requiere revisión del admin. */
     needsReview: boolean('needs_review').notNull().default(false),
+    /** ¿Ya se descontó el stock de este pedido? (permite reponerlo al cancelar). */
+    stockDeducted: boolean('stock_deducted').notNull().default(false),
     paidAt: tstz('paid_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

@@ -6,12 +6,15 @@ import { mailerFromEnv, type Mailer } from './lib/mailer';
 import type { PoolOpener } from './lib/tx';
 import { onError, onNotFound } from './middleware/errors';
 import { corsPolicy, originCheck, securityHeaders } from './middleware/security';
+import { accountRoutes } from './routes/account';
 import { adminRoutes } from './routes/admin';
 import { createCloudinary, type CloudinaryClient } from './lib/cloudinary';
 import { authRoutes } from './routes/auth';
 import { health } from './routes/health';
 import { publicRoutes } from './routes/public';
 import { publicCoursesRoutes } from './routes/public-courses';
+import { publicOrderRoutes } from './routes/public-orders';
+import { webhooks } from './routes/webhooks';
 
 export interface AppDeps {
   /** Inyectables para tests. Por defecto: Neon (HTTP) y Resend/consola. */
@@ -52,6 +55,9 @@ export function createApp(deps: AppDeps = {}) {
   app.route('/admin', adminRoutes);
   app.route('/public', publicRoutes);
   app.route('/public', publicCoursesRoutes);
+  app.route('/public', publicOrderRoutes);
+  app.route('/account', accountRoutes);
+  app.route('/webhooks', webhooks);
 
   app.onError(onError);
   app.notFound(onNotFound);

@@ -15,6 +15,13 @@
       "when": 1795313324367,
       "tag": "0001_sturdy_night_nurse",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795314335997,
+      "tag": "0002_dark_lethal_legion",
+      "breakpoints": true
     }
   ]
 }

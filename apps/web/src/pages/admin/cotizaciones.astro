@@ -1,0 +1,44 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Cotizaciones" active="cotizaciones">
+  <div class="page-head"><h1>Cotizaciones y mensajes</h1></div>
+  <form class="toolbar" id="filters">
+    <select class="select" name="status" aria-label="Estado">
+      <option value="">Todas</option><option value="nueva">Nuevas</option><option value="contactada">Contactadas</option><option value="cerrada">Cerradas</option>
+    </select>
+    <button class="btn" type="submit">Filtrar</button>
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Solicitante</th><th>Servicio</th><th>Detalle</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <script>
+    import { $, api, errorMessage, esc, fmtBogota, toast } from '../../lib/admin-client';
+    interface Row { id: string; name: string; email: string; phone: string | null; desiredDate: string | null; details: string; status: string; createdAt: string; serviceName: string | null }
+    const form = $<HTMLFormElement>('#filters');
+    async function load() {
+      const status = new FormData(form).get('status');
+      try {
+        const r = await api<{ items: Row[] }>(`/admin/quotes${status ? `?status=${status}` : ''}`);
+        $('#rows').innerHTML = r.items.length
+          ? r.items.map((q) => `<tr><td><strong>${esc(q.name)}</strong><br><small><a href="mailto:${esc(q.email)}">${esc(q.email)}</a>${q.phone ? ` · ${esc(q.phone)}` : ''}</small><br><small>${fmtBogota(q.createdAt)}</small></td>
+              <td>${esc(q.serviceName ?? 'Mensaje de contacto')}${q.desiredDate ? `<br><small>Fecha deseada: ${fmtBogota(q.desiredDate)}</small>` : ''}</td>
+              <td style="max-width:22rem;white-space:pre-wrap">${esc(q.details)}</td>
+              <td><span class="badge ${q.status === 'nueva' ? 'badge--solid' : 'badge--mute'}">${esc(q.status)}</span></td>
+              <td class="actions">${['nueva', 'contactada', 'cerrada'].filter((s) => s !== q.status).map((s) => `<button class="btn btn--sm" data-id="${q.id}" data-s="${s}">${s === 'cerrada' ? 'Cerrar' : s === 'contactada' ? 'Contactada' : 'Reabrir'}</button>`).join('')}</td></tr>`).join('')
+          : '<tr><td colspan="5" class="empty">No hay solicitudes</td></tr>';
+      } catch (err) { toast(errorMessage(err), 'error'); }
+    }
+    $('#rows').addEventListener('click', async (e) => {
+      const d = (e.target as HTMLElement).dataset;
+      if (!d.id) return;
+      try { await api(`/admin/quotes/${d.id}`, 'PATCH', { status: d.s }); await load(); } catch (err) { toast(errorMessage(err), 'error'); }
+    });
+    form.addEventListener('submit', (e) => { e.preventDefault(); void load(); });
+    void load();
+  </script>
+</AdminLayout>

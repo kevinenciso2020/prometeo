@@ -76,3 +76,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const actual = await pbkdf2(password, fromBase64Url(saltB64), iterations);
   return timingSafeEqual(actual, expected);
 }
+
+/** Hex -> bytes; null si no es hexadecimal válido (para comparar firmas en tiempo constante). */
+export function fromHexLoose(hex: string): Uint8Array | null {
+  if (hex.length === 0 || hex.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(hex)) return null;
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}

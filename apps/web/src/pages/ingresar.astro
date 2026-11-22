@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthCard from '../components/AuthCard.astro';
+---
+
+<BaseLayout title="Ingresar" noindex cacheable={false} description="Ingresa a tu cuenta de Prometeo">
+  <AuthCard title="Ingresar" lead="Consulta tus pedidos e inscripciones.">
+    <form id="form" class="stack" novalidate>
+      <div class="field"><label for="email">Correo electrónico</label><input class="input" id="email" name="email" type="email" autocomplete="username" required /></div>
+      <div class="field"><label for="password">Contraseña</label><input class="input" id="password" name="password" type="password" autocomplete="current-password" required /></div>
+      <p class="form-error" id="msg" role="alert"></p>
+      <button class="btn btn--primary" type="submit">Ingresar</button>
+    </form>
+    <p><a href="/recuperar-clave">¿Olvidaste tu contraseña?</a></p>
+    <p>¿Aún no tienes cuenta? <a href="/registro">Crear cuenta</a></p>
+  </AuthCard>
+  <script>
+    import { call, errText } from '../lib/account-client';
+    const form = document.getElementById('form') as HTMLFormElement;
+    const msg = document.getElementById('msg') as HTMLElement;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      const d = new FormData(form);
+      try {
+        const r = await call<{ user: { role: string } }>('/auth/login', 'POST', { email: String(d.get('email')), password: String(d.get('password')) });
+        const next = new URLSearchParams(location.search).get('next');
+        const safe = next && next.startsWith('/') && !next.startsWith('//') ? next : r.user.role === 'CLIENTE' ? '/mi-cuenta' : '/admin';
+        location.href = safe;
+      } catch (err) {
+        msg.textContent = errText(err);
+      }
+    });
+  </script>
+</BaseLayout>

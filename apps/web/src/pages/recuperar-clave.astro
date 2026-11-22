@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthCard from '../components/AuthCard.astro';
+---
+
+<BaseLayout title="Recuperar contraseña" noindex cacheable={false} description="Recupera tu contraseña">
+  <AuthCard title="Recuperar contraseña" lead="Te enviaremos un enlace para elegir una nueva contraseña.">
+    <form id="form" class="stack" novalidate>
+      <div class="field"><label for="email">Correo electrónico</label><input class="input" id="email" name="email" type="email" autocomplete="email" required /></div>
+      <p class="form-error" id="msg" role="alert"></p>
+      <button class="btn btn--primary" type="submit">Enviar enlace</button>
+    </form>
+  </AuthCard>
+  <script>
+    import { call, errText } from '../lib/account-client';
+    const form = document.getElementById('form') as HTMLFormElement;
+    const msg = document.getElementById('msg') as HTMLElement;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      try {
+        await call('/auth/forgot-password', 'POST', { email: String(new FormData(form).get('email') ?? '') });
+        msg.style.color = 'var(--color-success)';
+        msg.textContent = 'Si el correo existe, te enviamos las instrucciones.';
+      } catch (err) {
+        msg.style.color = '';
+        msg.textContent = errText(err);
+      }
+    });
+  </script>
+</BaseLayout>
