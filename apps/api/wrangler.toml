@@ -43,3 +43,43 @@ namespace_id = "1002"
 simple = { limit = 20, period = 60 }
 
 # Secretos (NO van aquí): wrangler secret put DATABASE_URL | JWT_SECRET | RESEND_API_KEY | CLOUDINARY_API_KEY | CLOUDINARY_API_SECRET | WOMPI_INTEGRITY_SECRET | WOMPI_EVENTS_SECRET
+
+# =====================================================================
+# PRODUCCIÓN — `wrangler deploy --env production`
+# Wrangler NO hereda vars/triggers/ratelimits entre entornos: se repiten aquí.
+# Antes de desplegar reemplaza TODOS los valores marcados con <…>.
+# =====================================================================
+[env.production]
+name = "prometeo-api"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+WEB_ORIGIN = "https://<dominio>"
+WEB_URL = "https://<dominio>"
+EMAIL_FROM = "Prometeo <no-reply@<dominio>>"
+COOKIE_DOMAIN = ".<dominio>"
+CLOUDINARY_CLOUD_NAME = "<tu-cloud-name>"
+WOMPI_PUBLIC_KEY = "pub_prod_<…>"
+
+[env.production.triggers]
+crons = ["*/15 * * * *", "0 * * * *", "0 10 * * *"]
+
+[[env.production.ratelimits]]
+name = "RL_AUTH"
+namespace_id = "2001"
+simple = { limit = 10, period = 60 }
+
+[[env.production.ratelimits]]
+name = "RL_PUBLIC"
+namespace_id = "2002"
+simple = { limit = 20, period = 60 }
+
+[[env.production.ratelimits]]
+name = "RL_WEBHOOK"
+namespace_id = "2003"
+simple = { limit = 300, period = 60 }
+
+[[env.production.ratelimits]]
+name = "RL_TRACK"
+namespace_id = "2004"
+simple = { limit = 60, period = 60 }

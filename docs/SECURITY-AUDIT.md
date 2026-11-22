@@ -26,6 +26,7 @@ Revisión punto por punto de la sección 5 del alcance. Estado: ✅ cumple y ver
 - **Honeypot** en checkout e inscripción (anti-bots) además del rate limiting.
 
 ## Dependencias (`pnpm audit --prod`)
+
 Tras actualizar a **Astro 7.4 / @astrojs/cloudflare 14.4** pasaron de 17 hallazgos (3 críticos, 3 altos) a **5 (2 críticos, 3 moderados)**. Se cerraron el RCE de Astro y las alertas de `sharp`.
 
 Quedan `tinypool` (crítico) y `vitest`/`@vitest/mocker` (moderados), todos bajo `wrangler > @cloudflare/workers-utils > vitest`: es una herramienta interna de wrangler que no se ejecuta en el Worker en producción ni en nuestro build. Forzar un override de versión mayor arriesga romper el tooling; se resolverá cuando wrangler actualice su dependencia. Acción recomendada: activar Dependabot y revisar tras cada actualización de wrangler.
