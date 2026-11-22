@@ -1,6 +1,7 @@
 /** Rutas con datos personales o de sesión: nunca se cachean. Mantener alineado con `cacheable={false}`. */
 const PRIVATE_PREFIXES = [
   '/admin',
+  '/api',
   '/carrito',
   '/checkout',
   '/ingresar',

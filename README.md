@@ -24,6 +24,8 @@ Comandos útiles: `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build`
 
 Arquitectura: dos Workers — `prometeo-api` en `api.<dominio>` y `prometeo-web` en `<dominio>`. Comparten cookies con `Domain=.<dominio>`.
 
+> **Proxy `/api`:** el navegador nunca llama a la API directamente: la web reenvía `/api/*` a la API por un service binding (`apps/web/src/pages/api/[...path].ts`). Así la sesión usa cookies de primera parte y el login/admin funcionan incluso en `*.workers.dev`, sin dominio propio. Si usas dominio propio, `COOKIE_DOMAIN` sigue siendo útil pero ya no es imprescindible. `WEB_ORIGIN` debe coincidir con la URL pública de la web.
+
 ### 1. Base de datos (Neon)
 
 1. Crea el proyecto y copia dos cadenas: **directa** (para migrar) y **pooled** (host con `-pooler`, para el Worker).

@@ -18,3 +18,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_SITE_URL?: string;
   readonly PUBLIC_CLOUDINARY_CLOUD_NAME?: string;
 }
+
+/** Tipos mínimos del módulo de runtime de Cloudflare (solo usamos `env`). */
+declare module 'cloudflare:workers' {
+  export const env: Record<string, unknown>;
+}

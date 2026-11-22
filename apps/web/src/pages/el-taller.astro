@@ -1,11 +1,13 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Picture from '../components/Picture.astro';
 ---
 
 <BaseLayout title="El taller" nav="taller" description="Conoce Prometeo: un taller de cerámica artesanal donde el barro, el fuego y las manos dan forma a piezas únicas.">
   <div class="container section">
     <p class="eyebrow">Sobre nosotros</p>
     <h1>El taller</h1>
+    <Picture src="/img/torno-manos.jpg" alt="Manos modelando una pieza sobre el torno" ratio="21 / 9" width={1400} eager class="cover" />
     <div class="prose">
       <p class="lead">Prometeo es un taller de cerámica donde cada pieza nace del barro, pasa por el fuego y llega a tus manos con la huella de quien la hizo.</p>
       <p>Trabajamos con técnicas de torno y modelado a mano, esmaltes propios y hornadas pequeñas. Por eso cada pieza es distinta: pequeñas variaciones de color y forma son parte de su carácter.</p>
@@ -18,6 +20,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 </BaseLayout>
 
 <style>
+  :global(.cover) {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-clay);
+    margin-bottom: var(--space-7);
+  }
   h1 {
     font-size: var(--text-3xl);
     margin-block: var(--space-2) var(--space-5);

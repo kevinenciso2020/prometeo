@@ -7,7 +7,8 @@ import {
 
 export { formatCop };
 
-export const API_URL: string = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
+/** Base de la API desde el NAVEGADOR: mismo origen (proxy en pages/api/[...path].ts), así las cookies de sesión son de primera parte. */
+export const API_URL = '/api';
 export const CLOUD_NAME: string = import.meta.env.PUBLIC_CLOUDINARY_CLOUD_NAME ?? '';
 
 export class ApiError extends Error {

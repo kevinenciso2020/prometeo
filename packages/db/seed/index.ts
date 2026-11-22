@@ -76,6 +76,110 @@ async function main() {
     ])
     .onConflictDoNothing();
 
+  // Productos demo adicionales (para que la tienda no se vea vacía).
+  const [platos] = await db
+    .select()
+    .from(s.categories)
+    .where(sql`slug = 'platos'`)
+    .limit(1);
+  await db
+    .insert(s.products)
+    .values([
+      {
+        name: 'Platos Océano',
+        slug: 'platos-oceano',
+        description: 'Set de platos con esmalte azul cielo y borde irregular, hechos a mano.',
+        price: 120000,
+        stock: 6,
+        sku: 'PLA-001',
+        categoryId: platos?.id,
+        status: 'publicado',
+        isFeatured: true,
+      },
+      {
+        name: 'Tazas Hueso',
+        slug: 'tazas-hueso',
+        description: 'Tazas modeladas a mano en arcilla blanca, sin esmalte exterior.',
+        price: 52000,
+        stock: 10,
+        sku: 'TAZ-002',
+        categoryId: tazas?.id,
+        status: 'publicado',
+        isFeatured: true,
+      },
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(s.services)
+    .values([
+      {
+        name: 'Vajillas a la medida',
+        slug: 'vajillas-a-la-medida',
+        description:
+          'Diseñamos y hacemos tu vajilla: formas, esmaltes y cantidades a tu medida. Cuéntanos qué necesitas y te cotizamos.',
+        mode: 'cotizacion',
+        status: 'publicado',
+      },
+      {
+        name: 'Taller para grupos',
+        slug: 'taller-para-grupos',
+        description:
+          'Una tarde de barro para equipos, cumpleaños o despedidas. Materiales y horneado incluidos.',
+        mode: 'cotizacion',
+        status: 'publicado',
+      },
+    ])
+    .onConflictDoNothing();
+
+  // Imágenes demo (archivos en apps/web/public/img). Solo si el registro aún no tiene imágenes.
+  const demoImg = (file: string, alt: string, primary = true) => ({
+    url: `/img/${file}.jpg`,
+    publicId: `local/${file}`,
+    alt,
+    isPrimary: primary,
+  });
+  const productImgs: Record<string, [string, string]> = {
+    'taza-arcilla': ['tazas-moteadas', 'Tazas de gres moteado con base color miel'],
+    'jarron-luna': ['jarrones-grises', 'Tres jarrones de cerámica gris sobre fondo oscuro'],
+    'platos-oceano': ['platos-azules', 'Platos de cerámica azul claro apilados'],
+    'tazas-hueso': ['tazas-blancas', 'Tazas blancas modeladas a mano, apiladas'],
+  };
+  for (const [slug, [file, alt]] of Object.entries(productImgs)) {
+    const [row] = await db
+      .select()
+      .from(s.products)
+      .where(sql`slug = ${slug}`)
+      .limit(1);
+    if (!row) continue;
+    const has = await db
+      .select()
+      .from(s.productImages)
+      .where(sql`product_id = ${row.id}`)
+      .limit(1);
+    if (!has.length)
+      await db.insert(s.productImages).values({ productId: row.id, ...demoImg(file, alt) });
+  }
+  const serviceImgs: Record<string, [string, string]> = {
+    'vajillas-a-la-medida': ['platos-azules', 'Vajilla azul hecha a mano'],
+    'taller-para-grupos': ['terracota', 'Piezas de terracota secándose al sol'],
+  };
+  for (const [slug, [file, alt]] of Object.entries(serviceImgs)) {
+    const [row] = await db
+      .select()
+      .from(s.services)
+      .where(sql`slug = ${slug}`)
+      .limit(1);
+    if (!row) continue;
+    const has = await db
+      .select()
+      .from(s.serviceImages)
+      .where(sql`service_id = ${row.id}`)
+      .limit(1);
+    if (!has.length)
+      await db.insert(s.serviceImages).values({ serviceId: row.id, ...demoImg(file, alt) });
+  }
+
   const [course] = await db
     .insert(s.courses)
     .values({
@@ -113,6 +217,31 @@ async function main() {
         })),
       );
     }
+  }
+
+  const [iniciacion] = await db
+    .select()
+    .from(s.courses)
+    .where(sql`slug = 'iniciacion-al-torno'`)
+    .limit(1);
+  if (iniciacion) {
+    const has = await db
+      .select()
+      .from(s.courseImages)
+      .where(sql`course_id = ${iniciacion.id}`)
+      .limit(1);
+    if (!has.length)
+      await db.insert(s.courseImages).values([
+        {
+          courseId: iniciacion.id,
+          ...demoImg('torno-manos', 'Manos modelando una pieza en el torno'),
+        },
+        {
+          courseId: iniciacion.id,
+          ...demoImg('hero-torno', 'Manos de alfarero sobre el torno, en blanco y negro', false),
+          sortOrder: 1,
+        },
+      ]);
   }
 
   await db
