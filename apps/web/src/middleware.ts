@@ -1,4 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
+import { serverFetch } from './lib/api-server';
 import { cacheControlFor } from './lib/cache-control';
 import { applySecurityHeaders } from './lib/security-headers';
 
@@ -19,7 +20,7 @@ const guard = defineMiddleware(async (context, next) => {
 
   let user: MeResponse['user'] | null = null;
   try {
-    const res = await fetch(`${API}/auth/me`, {
+    const res = await serverFetch('/auth/me', {
       headers: { cookie: context.request.headers.get('cookie') ?? '' },
     });
     if (res.ok) user = ((await res.json()) as MeResponse).user;

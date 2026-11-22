@@ -1,4 +1,5 @@
 /** Utilidades del lado servidor para consumir la API y datos del sitio. */
+import { serverFetch } from './api-server';
 export const API_URL: string = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
 export const SITE_URL: string = (
   import.meta.env.PUBLIC_SITE_URL ?? 'http://localhost:4321'
@@ -9,7 +10,7 @@ export const SITE_TAGLINE = 'Taller de cerámica artesanal';
 /** GET a la API; devuelve null si falla (la página muestra un mensaje amable). */
 export async function apiGet<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`${API_URL}${path}`, { headers: { Accept: 'application/json' } });
+    const res = await serverFetch(path, { headers: { Accept: 'application/json' } });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {

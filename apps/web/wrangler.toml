@@ -9,3 +9,8 @@ compatibility_date = "2025-09-01"
 # OJO: Astro incrusta PUBLIC_API_URL en el BUILD. En producción defínela como variable de
 # entorno al compilar (en CI: vars.PUBLIC_API_URL), no solo aquí.
 PUBLIC_API_URL = "http://localhost:8787"
+
+# Service binding a la API: el SSR llama a la API sin pasar por internet (ver src/lib/api-server.ts).
+[[services]]
+binding = "API"
+service = "prometeo-api"
