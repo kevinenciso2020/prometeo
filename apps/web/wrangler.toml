@@ -1,0 +1,6 @@
+name = "prometeo-web"
+compatibility_date = "2025-09-01"
+# La configuración final de despliegue (assets/main del adaptador) se cierra en la Fase 3/7.
+
+[vars]
+PUBLIC_API_URL = "http://localhost:8787"

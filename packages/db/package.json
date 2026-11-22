@@ -1,0 +1,27 @@
+{
+  "name": "@prometeo/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "node --env-file=../../.env ../../node_modules/.pnpm/node_modules/drizzle-kit/bin.cjs migrate",
+    "seed": "tsx --env-file=../../.env seed/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0",
+    "@prometeo/shared": "workspace:*",
+    "drizzle-orm": "^0.45.0"
+  },
+  "devDependencies": {
+    "@prometeo/config": "workspace:*",
+    "@types/node": "^22.10.0",
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3"
+  }
+}

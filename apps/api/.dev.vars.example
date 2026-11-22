@@ -1,0 +1,11 @@
+# Copia este archivo a .dev.vars (está en .gitignore). Wrangler lo carga en `pnpm dev`.
+# En producción estos valores se cargan con: wrangler secret put <NOMBRE>
+
+# Cadena de Neon. Para el Worker usa la cadena POOLED (host con -pooler) o la directa.
+DATABASE_URL="postgresql://usuario:clave@ep-xxxx.us-east-2.aws.neon.tech/prometeo?sslmode=require"
+
+# Clave para firmar los JWT. Genera una con: openssl rand -base64 48
+JWT_SECRET="cambia-esto-por-un-secreto-largo-y-aleatorio"
+
+# Opcional en local: si falta, los correos se imprimen en la consola.
+# RESEND_API_KEY="re_xxxxxxxxxxxx"

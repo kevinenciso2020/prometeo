@@ -1,0 +1,21 @@
+node_modules
+dist
+.wrangler
+.astro
+*.log
+.DS_Store
+coverage
+
+# Variables de entorno (todas, en cualquier carpeta). Solo se versionan los *.example.
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Archivos de instrucciones para agentes de IA
+CLAUDE.md
+AGENTS.md
+**/CLAUDE.md
+**/AGENTS.md
