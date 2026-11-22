@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
-import { createHttpDb, type Db } from '@prometeo/db';
+import { createHttpDb, createPoolDb, type Db } from '@prometeo/db';
 import { scheduled } from './cron';
 import type { AppEnv, Bindings } from './env';
 import { mailerFromEnv, type Mailer } from './lib/mailer';
+import type { PoolOpener } from './lib/tx';
 import { onError, onNotFound } from './middleware/errors';
 import { corsPolicy, originCheck, securityHeaders } from './middleware/security';
 import { adminRoutes } from './routes/admin';
@@ -10,12 +11,15 @@ import { createCloudinary, type CloudinaryClient } from './lib/cloudinary';
 import { authRoutes } from './routes/auth';
 import { health } from './routes/health';
 import { publicRoutes } from './routes/public';
+import { publicCoursesRoutes } from './routes/public-courses';
 
 export interface AppDeps {
   /** Inyectables para tests. Por defecto: Neon (HTTP) y Resend/consola. */
   getDb?: (env: Bindings) => Db;
   getMailer?: (env: Bindings) => Mailer;
   getCloudinary?: (env: Bindings) => CloudinaryClient;
+  /** Conexión con transacciones (Pool WebSocket). En tests devuelve la misma BD en memoria. */
+  getPool?: (env: Bindings) => PoolOpener;
 }
 
 export function createApp(deps: AppDeps = {}) {
@@ -39,6 +43,7 @@ export function createApp(deps: AppDeps = {}) {
           }))
       )(c.env),
     );
+    c.set('openPool', (deps.getPool ?? ((env) => () => createPoolDb(env.DATABASE_URL)))(c.env));
     await next();
   });
 
@@ -46,6 +51,7 @@ export function createApp(deps: AppDeps = {}) {
   app.route('/auth', authRoutes);
   app.route('/admin', adminRoutes);
   app.route('/public', publicRoutes);
+  app.route('/public', publicCoursesRoutes);
 
   app.onError(onError);
   app.notFound(onNotFound);

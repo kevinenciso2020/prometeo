@@ -1,0 +1,216 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Picture from '../../components/Picture.astro';
+import { formatCop, PAYMENT_MODE_LABELS } from '@prometeo/shared';
+import { apiGet, fmtDateTime, fmtDay, fmtTime, SITE_URL, type CourseDetail } from '../../lib/site';
+import { cld, ogImage } from '../../lib/images';
+
+const { slug } = Astro.params;
+const res = await apiGet<{ item: CourseDetail }>(`/public/courses/${encodeURIComponent(slug ?? '')}`);
+if (!res) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+const c = res.item;
+const editions = c.editions.filter((e) => e.open);
+const seatsLabel = (e: { full: boolean; seatsLeft: number }): string => {
+  if (e.full) return 'Cupo lleno';
+  if (e.seatsLeft < 4) return `¡Últimos ${e.seatsLeft} cupos!`;
+  return `${e.seatsLeft} cupos disponibles`;
+};
+const description = (c.description || `${c.name}: curso de cerámica en Prometeo.`).slice(0, 160);
+
+const ld = {
+  '@context': 'https://schema.org',
+  '@type': 'Course',
+  name: c.name,
+  description,
+  provider: { '@type': 'Organization', name: 'Prometeo', url: SITE_URL },
+  image: c.images.map((i) => cld(i.url, 1200)),
+  hasCourseInstance: editions.map((e) => ({
+    '@type': 'CourseInstance',
+    courseMode: 'onsite',
+    startDate: e.firstStart ?? undefined,
+    endDate: e.sessions.at(-1)?.endsAt,
+    location: { '@type': 'Place', name: e.location },
+    ...(e.instructor && { instructor: { '@type': 'Person', name: e.instructor } }),
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'COP',
+      price: e.price,
+      availability: e.full ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+      url: `${SITE_URL}/cursos/${c.slug}`,
+    },
+  })),
+};
+const events = editions.flatMap((e) =>
+  e.sessions.slice(0, 1).map((s) => ({
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: c.name,
+    startDate: s.startsAt,
+    endDate: s.endsAt,
+    eventAttendanceMode: 'https://schema.org/OfflineEventMode',
+    eventStatus: 'https://schema.org/EventScheduled',
+    location: { '@type': 'Place', name: e.location },
+    image: c.images.map((i) => cld(i.url, 1200)),
+    description,
+    offers: { '@type': 'Offer', priceCurrency: 'COP', price: e.price, availability: e.full ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock', url: `${SITE_URL}/cursos/${c.slug}` },
+  })),
+);
+---
+
+<BaseLayout title={c.name} nav="cursos" description={description} image={ogImage(c.images[0]?.url)} structuredData={[ld, ...events]}>
+  <div class="container section">
+    <nav class="crumbs" aria-label="Ruta"><a href="/cursos">Cursos</a></nav>
+    <div class="layout">
+      <div>
+        <Picture src={c.images[0]?.url} alt={c.images[0]?.alt ?? c.name} ratio="4 / 3" width={1024} sizes="(min-width: 60rem) 45vw, 100vw" eager class="main" />
+        {c.images.length > 1 && (
+          <div class="more">{c.images.slice(1, 5).map((img) => <Picture src={img.url} alt={img.alt ?? c.name} ratio="1 / 1" width={320} sizes="12rem" />)}</div>
+        )}
+      </div>
+      <div class="info">
+        {c.level && <p class="eyebrow">{c.level}{c.durationText ? ` · ${c.durationText}` : ''}</p>}
+        <h1>{c.name}</h1>
+        <div class="prose"><p>{c.description}</p></div>
+        {c.includes && (<div class="inc"><h2>Qué incluye</h2><p>{c.includes}</p></div>)}
+      </div>
+    </div>
+
+    <section class="editions" aria-labelledby="ed-title">
+      <h2 id="ed-title">Próximas ediciones</h2>
+      {
+        editions.length === 0 ? (
+          <p class="state">No hay ediciones abiertas por ahora. <a href="/contacto">Escríbenos</a> y te avisamos cuando abramos inscripciones.</p>
+        ) : (
+          <ul role="list" class="ed-list">
+            {editions.map((e) => (
+              <li class="ed">
+                <div>
+                  <h3>{e.firstStart ? fmtDay(e.firstStart) : 'Fecha por definir'}</h3>
+                  <ul role="list" class="sessions">
+                    {e.sessions.map((s) => <li>{fmtDateTime(s.startsAt)} – {fmtTime(s.endsAt)}</li>)}
+                  </ul>
+                  <p class="meta">{e.location}{e.instructor ? ` · ${e.instructor}` : ''}</p>
+                  <p class="meta">Inscripciones hasta el {fmtDay(e.enrollmentDeadline)}</p>
+                  <p class="modes">{e.allowedPaymentModes.map((m) => PAYMENT_MODE_LABELS[m]).join(' · ')}</p>
+                </div>
+                <div class="ed__side">
+                  <p class="price">{formatCop(e.price)}</p>
+                  <p class={e.full ? 'seats seats--full' : 'seats'}>
+                    {seatsLabel(e)}
+                  </p>
+                  <a class="btn btn--primary" href={`/inscribirse?curso=${c.slug}&edicion=${e.id}`}>{e.full ? 'Unirme a la lista de espera' : 'Inscribirme'}</a>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .crumbs {
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-5);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-7);
+    align-items: start;
+  }
+  :global(.main) {
+    border: var(--border-w) solid var(--color-line);
+  }
+  .more {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .info {
+    display: grid;
+    gap: var(--space-4);
+  }
+  h1 {
+    font-size: var(--text-2xl);
+  }
+  .prose p,
+  .inc p {
+    white-space: pre-line;
+  }
+  .editions {
+    margin-top: var(--space-8);
+  }
+  .ed-list {
+    display: grid;
+    gap: var(--space-5);
+    padding: 0;
+    margin-top: var(--space-5);
+  }
+  .ed {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-5);
+    border: var(--border-w) solid var(--color-line);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-hard);
+  }
+  .ed h3 {
+    font-size: var(--text-xl);
+    text-transform: capitalize;
+  }
+  .sessions {
+    padding: 0;
+    margin-block: var(--space-2);
+    font-size: var(--text-sm);
+  }
+  .meta {
+    font-size: var(--text-sm);
+    color: var(--color-ink-soft);
+  }
+  .modes {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .ed__side {
+    display: grid;
+    gap: var(--space-3);
+    align-content: start;
+    justify-items: end;
+    text-align: right;
+  }
+  .price {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+  }
+  .seats {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .seats--full {
+    color: var(--color-danger);
+  }
+  .state {
+    padding: var(--space-6);
+    border: var(--border-w) dashed var(--color-line);
+    margin-top: var(--space-4);
+  }
+  @media (max-width: 800px) {
+    .layout,
+    .ed {
+      grid-template-columns: 1fr;
+    }
+    .ed__side {
+      justify-items: start;
+      text-align: left;
+    }
+  }
+</style>

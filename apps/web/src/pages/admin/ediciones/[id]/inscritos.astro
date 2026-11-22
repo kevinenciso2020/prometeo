@@ -1,0 +1,100 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Inscritos" active="ediciones">
+  <div class="page-head">
+    <h1>Inscritos</h1>
+    <div class="actions">
+      <a class="btn" href={`/admin/ediciones/${id}`}>Ver edición</a>
+      <button class="btn btn--primary" id="export" type="button">Exportar CSV</button>
+    </div>
+  </div>
+  <div class="stats" id="stats" data-id={id}></div>
+  <div class="table-wrap" style="margin-top: var(--space-5)">
+    <table class="table">
+      <thead><tr><th>Persona</th><th>Estado</th><th>Modalidad</th><th class="num">Pagado</th><th class="num">Pendiente</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <dialog id="dlg" aria-labelledby="dlg-title">
+    <form id="form" class="stack" novalidate>
+      <h2 id="dlg-title">Registrar pago manual</h2>
+      <p id="who"></p>
+      <div class="field"><label for="amount">Monto (COP)</label><input class="input" id="amount" name="amount" type="number" min="1" step="1" required /></div>
+      <div class="field"><label for="method">Método</label><select class="select" id="method" name="method"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></div>
+      <div class="field"><label for="note">Nota</label><textarea class="textarea" id="note" name="note" style="min-height:4rem"></textarea></div>
+      <p class="form-error" id="error" role="alert"></p>
+      <div class="actions"><button class="btn" type="button" id="cancel">Cancelar</button><button class="btn btn--primary" type="submit">Registrar pago</button></div>
+    </form>
+  </dialog>
+
+  <script>
+    import { $, api, downloadFile, errorMessage, esc, fmtBogota, formatCop, toast } from '../../../../lib/admin-client';
+    interface Item { id: string; name: string; email: string; phone: string; status: string; paymentMode: string; paidAmount: number; totalAmount: number; pendingAmount: number; reservedUntil: string | null }
+    interface Data { edition: { maxSeats: number; occupied: number; seatsLeft: number; status: string }; totals: { collected: number; pending: number }; items: Item[] }
+    const id = $('#stats').dataset.id ?? '';
+    const dlg = $<HTMLDialogElement>('#dlg');
+    const form = $<HTMLFormElement>('#form');
+    let items: Item[] = [];
+    let current: Item | null = null;
+
+    async function load() {
+      const d = await api<Data>(`/admin/editions/${id}/enrollments`);
+      items = d.items;
+      $('#stats').innerHTML = `<div class="card stat"><span>Cupos</span><strong>${d.edition.occupied}/${d.edition.maxSeats}</strong><small>${d.edition.seatsLeft} libres · ${esc(d.edition.status)}</small></div>
+        <div class="card stat"><span>Recaudado</span><strong>${formatCop(d.totals.collected)}</strong></div>
+        <div class="card stat"><span>Por cobrar</span><strong>${formatCop(d.totals.pending)}</strong></div>`;
+      $('#stats').dataset.id = id;
+      $('#rows').innerHTML = items.length
+        ? items.map((i) => {
+            const live = !['vencida', 'cancelada'].includes(i.status);
+            return `<tr><td><strong>${esc(i.name)}</strong><br><small>${esc(i.email)} · ${esc(i.phone)}</small></td>
+              <td><span class="badge ${['abonada', 'pagada'].includes(i.status) ? 'badge--solid' : 'badge--mute'}">${esc(i.status)}</span>${i.reservedUntil ? `<br><small>hasta ${fmtBogota(i.reservedUntil)}</small>` : ''}</td>
+              <td>${esc(i.paymentMode)}</td><td class="num">${formatCop(i.paidAmount)}</td><td class="num">${formatCop(i.pendingAmount)}</td>
+              <td class="actions">${live && i.pendingAmount > 0 ? `<button class="btn btn--sm" data-pay="${i.id}">Registrar pago</button>` : ''}
+                ${live ? `<button class="btn btn--sm btn--danger" data-cancel="${i.id}">Cancelar</button>` : ''}
+                ${i.status === 'abonada' ? `<button class="btn btn--sm" data-remind="${i.id}">Recordar saldo</button>` : ''}</td></tr>`;
+          }).join('')
+        : '<tr><td colspan="6" class="empty">Aún no hay inscritos</td></tr>';
+    }
+
+    $('#rows').addEventListener('click', async (e) => {
+      const d = (e.target as HTMLElement).dataset;
+      try {
+        if (d.pay) {
+          current = items.find((i) => i.id === d.pay) ?? null;
+          if (!current) return;
+          form.reset();
+          $('#error').textContent = '';
+          $('#who').textContent = `${current.name} · pendiente ${formatCop(current.pendingAmount)}`;
+          $<HTMLInputElement>('#amount').value = String(current.pendingAmount);
+          dlg.showModal();
+        } else if (d.cancel && confirm('¿Cancelar esta inscripción? Se libera el cupo y se avisa a la lista de espera.')) {
+          const r = await api<{ waitlistNotified: number }>(`/admin/enrollments/${d.cancel}/cancel`, 'POST', {});
+          toast(r.waitlistNotified ? `Cancelada. Se avisó a ${r.waitlistNotified} persona(s) en lista` : 'Inscripción cancelada');
+          await load();
+        } else if (d.remind) {
+          await api(`/admin/enrollments/${d.remind}/remind-balance`, 'POST', {});
+          toast('Recordatorio enviado');
+        }
+      } catch (err) { toast(errorMessage(err), 'error'); }
+    });
+    $('#cancel').addEventListener('click', () => dlg.close());
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!current) return;
+      const f = new FormData(form);
+      try {
+        await api(`/admin/enrollments/${current.id}/payments`, 'POST', { amount: Number(f.get('amount')), method: String(f.get('method')), note: String(f.get('note') ?? '').trim() || null });
+        dlg.close();
+        toast('Pago registrado');
+        await load();
+      } catch (err) { $('#error').textContent = errorMessage(err); }
+    });
+    $('#export').addEventListener('click', () => downloadFile(`/admin/editions/${id}/enrollments/export`, `inscritos-${id.slice(0, 8)}.csv`).catch((err) => toast(errorMessage(err), 'error')));
+    void load().catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

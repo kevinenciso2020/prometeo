@@ -1,15 +1,15 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
-import { productImages, serviceImages, type Db } from '@prometeo/db';
+import { courseImages, productImages, serviceImages, type Db } from '@prometeo/db';
 import { isCloudinaryUrl, type ImageInput } from '@prometeo/shared';
 import { AuthError } from './auth.service';
 
-type ImageTable = typeof productImages | typeof serviceImages;
+type ImageTable = typeof productImages | typeof serviceImages | typeof courseImages;
 
 export interface ImageStore {
   table: ImageTable;
   fk: PgColumn;
-  fkKey: 'productId' | 'serviceId';
+  fkKey: 'productId' | 'serviceId' | 'courseId';
 }
 
 export const productImageStore: ImageStore = {
@@ -90,3 +90,9 @@ export async function syncImages(
   }
   return removed.map((r) => r.publicId);
 }
+
+export const courseImageStore: ImageStore = {
+  table: courseImages,
+  fk: courseImages.courseId,
+  fkKey: 'courseId',
+};

@@ -1,0 +1,131 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Edición" active="ediciones">
+  <div class="page-head">
+    <h1 id="title">Edición</h1>
+    <div class="actions">
+      <a class="btn" href="/admin/ediciones">Volver</a>
+      <a class="btn" id="to-enrollments" href="#" hidden>Ver inscritos</a>
+      <button class="btn btn--danger" id="delete" type="button" hidden>Eliminar</button>
+    </div>
+  </div>
+  <p class="hint" id="seats-info" style="margin-bottom: var(--space-4)"></p>
+  <form id="form" class="stack" data-id={id} novalidate>
+    <div class="card stack">
+      <h2>Datos generales</h2>
+      <div class="grid-2">
+        <div class="field"><label for="courseId">Curso</label><select class="select" id="courseId" name="courseId" required></select></div>
+        <div class="field"><label for="location">Lugar</label><input class="input" id="location" name="location" required /></div>
+        <div class="field"><label for="instructor">Instructor</label><input class="input" id="instructor" name="instructor" /></div>
+        <div class="field"><label for="maxSeats">Cupos máximos</label><input class="input" id="maxSeats" name="maxSeats" type="number" min="1" step="1" required /></div>
+        <div class="field"><label for="price">Precio (COP)</label><input class="input" id="price" name="price" type="number" min="0" step="1" required /></div>
+        <div class="field"><label for="status">Estado</label>
+          <select class="select" id="status" name="status"><option value="abierta">Abierta</option><option value="cerrada">Cerrada</option><option value="cancelada">Cancelada</option></select>
+          <span class="hint">«Llena» y «Finalizada» se asignan automáticamente.</span></div>
+        <div class="field"><label for="enrollmentDeadline">Fecha límite de inscripción</label><input class="input" id="enrollmentDeadline" name="enrollmentDeadline" type="datetime-local" required /><span class="hint">Hora de Colombia.</span></div>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h2>Sesiones</h2>
+      <div id="sessions" class="stack"></div>
+      <div><button class="btn btn--sm" type="button" id="add-session">Agregar sesión</button></div>
+    </div>
+
+    <div class="card stack">
+      <h2>Modalidades de pago habilitadas</h2>
+      <fieldset class="stack" style="border:0;padding:0;margin:0">
+        <legend class="sr-only">Modalidades</legend>
+        <label class="check"><input type="checkbox" name="mode" value="total" /> Pago total ahora (el cupo se confirma al aprobarse el pago)</label>
+        <label class="check"><input type="checkbox" name="mode" value="reserva" /> Reserva + pago después (el cupo vence si no se paga)</label>
+        <label class="check"><input type="checkbox" name="mode" value="abono" /> Abono + saldo</label>
+        <label class="check"><input type="checkbox" name="mode" value="lista" /> Lista sin reserva (también funciona como lista de espera)</label>
+      </fieldset>
+      <div class="grid-2">
+        <div class="field"><label for="reservationHours">Horas de reserva</label><input class="input" id="reservationHours" name="reservationHours" type="number" min="1" value="48" /><span class="hint">Nunca supera la fecha límite de inscripción.</span></div>
+        <div class="field"><label for="depositType">Tipo de abono</label><select class="select" id="depositType" name="depositType"><option value="porcentaje">Porcentaje (%)</option><option value="monto">Monto fijo (COP)</option></select></div>
+        <div class="field"><label for="depositValue">Valor del abono</label><input class="input" id="depositValue" name="depositValue" type="number" min="1" value="30" /></div>
+        <div class="field"><label for="balanceDueAt">Fecha límite del saldo</label><input class="input" id="balanceDueAt" name="balanceDueAt" type="datetime-local" /></div>
+      </div>
+    </div>
+    <p class="form-error" id="error" role="alert"></p>
+    <div><button class="btn btn--primary" type="submit">Guardar edición</button></div>
+  </form>
+
+  <script>
+    import { $, api, errorMessage, fillForm, readForm, toBogotaIso, toBogotaLocal, toast } from '../../../lib/admin-client';
+    interface Ed { id: string; occupied: number; seatsLeft: number; maxSeats: number; status: string; enrollmentDeadline: string; balanceDueAt: string | null; allowedPaymentModes: string[]; sessions: { startsAt: string; endsAt: string }[]; course: { name: string } }
+    const form = $<HTMLFormElement>('#form');
+    const error = $('#error');
+    const sessionsEl = $('#sessions');
+    const id = form.dataset.id && form.dataset.id !== 'nueva' ? form.dataset.id : null;
+
+    function addSession(start = '', end = '') {
+      const row = document.createElement('div');
+      row.className = 'grid-2 session';
+      row.innerHTML = `<div class="field"><label>Inicio</label><input class="input s-start" type="datetime-local" required /></div>
+        <div class="field"><label>Fin</label><input class="input s-end" type="datetime-local" required /></div>
+        <div><button class="btn btn--sm btn--danger" type="button">Quitar</button></div>`;
+      row.querySelector<HTMLInputElement>('.s-start')!.value = start;
+      row.querySelector<HTMLInputElement>('.s-end')!.value = end;
+      row.querySelector('button')!.addEventListener('click', () => { if (sessionsEl.children.length > 1) row.remove(); });
+      sessionsEl.append(row);
+    }
+    $('#add-session').addEventListener('click', () => addSession());
+
+    async function init() {
+      const courses = await api<{ items: { id: string; name: string }[] }>('/admin/courses?pageSize=100');
+      const sel = $<HTMLSelectElement>('#courseId');
+      for (const c of courses.items) sel.append(new Option(c.name, c.id));
+      if (!id) {
+        $('#title').textContent = 'Nueva edición';
+        const preset = new URLSearchParams(location.search).get('curso');
+        if (preset) sel.value = preset;
+        addSession();
+        for (const cb of form.querySelectorAll<HTMLInputElement>('input[name=mode]')) cb.checked = cb.value === 'total';
+        return;
+      }
+      const { item } = await api<{ item: Ed & Record<string, unknown> }>(`/admin/editions/${id}`);
+      $('#title').textContent = `Edición · ${item.course.name}`;
+      fillForm(form, { ...item, enrollmentDeadline: toBogotaLocal(item.enrollmentDeadline), balanceDueAt: item.balanceDueAt ? toBogotaLocal(item.balanceDueAt) : '' });
+      $<HTMLSelectElement>('#status').value = ['abierta', 'cerrada', 'cancelada'].includes(item.status) ? item.status : 'abierta';
+      for (const cb of form.querySelectorAll<HTMLInputElement>('input[name=mode]')) cb.checked = item.allowedPaymentModes.includes(cb.value);
+      item.sessions.forEach((s) => addSession(toBogotaLocal(s.startsAt), toBogotaLocal(s.endsAt)));
+      $('#seats-info').textContent = `Cupos ocupados: ${item.occupied} de ${item.maxSeats} · Estado actual: ${item.status}`;
+      const link = $<HTMLAnchorElement>('#to-enrollments');
+      link.hidden = false;
+      link.href = `/admin/ediciones/${id}/inscritos`;
+      $<HTMLButtonElement>('#delete').hidden = false;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      const v = readForm(form);
+      const sessions = [...sessionsEl.querySelectorAll<HTMLElement>('.session')].map((row) => ({
+        startsAt: toBogotaIso(row.querySelector<HTMLInputElement>('.s-start')!.value),
+        endsAt: toBogotaIso(row.querySelector<HTMLInputElement>('.s-end')!.value),
+      }));
+      const body = {
+        courseId: v.courseId, location: v.location, instructor: v.instructor, maxSeats: v.maxSeats, price: v.price, status: v.status,
+        enrollmentDeadline: v.enrollmentDeadline ? toBogotaIso(String(v.enrollmentDeadline)) : '',
+        balanceDueAt: v.balanceDueAt ? toBogotaIso(String(v.balanceDueAt)) : null,
+        allowedPaymentModes: [...form.querySelectorAll<HTMLInputElement>('input[name=mode]:checked')].map((c) => c.value),
+        reservationHours: v.reservationHours ?? 48, depositType: v.depositType, depositValue: v.depositValue ?? 30, sessions,
+      };
+      try {
+        const r = id ? await api<{ item: { id: string } }>(`/admin/editions/${id}`, 'PUT', body) : await api<{ item: { id: string } }>('/admin/editions', 'POST', body);
+        toast('Edición guardada');
+        if (!id) location.href = `/admin/ediciones/${r.item.id}`;
+      } catch (err) { error.textContent = errorMessage(err); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
+    });
+    $('#delete').addEventListener('click', async () => {
+      if (!id || !confirm('¿Eliminar esta edición?')) return;
+      try { await api(`/admin/editions/${id}`, 'DELETE'); location.href = '/admin/ediciones'; } catch (err) { toast(errorMessage(err), 'error'); }
+    });
+    void init().catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

@@ -185,3 +185,41 @@ export async function uploadImage(
 export function thumb(url: string, width = 240): string {
   return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width},c_fill,ar_1:1/`);
 }
+
+/* ---------- Fechas (America/Bogota = UTC-5, sin horario de verano) ---------- */
+const BOGOTA_OFFSET_MS = 5 * 3_600_000;
+
+/** Valor de <input type="datetime-local"> interpretado en hora de Colombia -> ISO con offset. */
+export function toBogotaIso(local: string): string {
+  return `${local.length === 16 ? `${local}:00` : local}-05:00`;
+}
+
+/** ISO/Date -> "YYYY-MM-DDTHH:mm" en hora de Colombia, para <input type="datetime-local">. */
+export function toBogotaLocal(value: string | Date): string {
+  return new Date(new Date(value).getTime() - BOGOTA_OFFSET_MS).toISOString().slice(0, 16);
+}
+
+export function fmtBogota(value: string | Date | null | undefined): string {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'America/Bogota',
+  }).format(new Date(value));
+}
+
+/** Descarga un archivo autenticado (con renovación de sesión si hace falta). */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  let res = await fetch(`${API_URL}${path}`, { credentials: 'include' });
+  if (res.status === 401 && (await refreshSession()))
+    res = await fetch(`${API_URL}${path}`, { credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, 'DOWNLOAD', 'No se pudo descargar el archivo');
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

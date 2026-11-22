@@ -1,0 +1,88 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ImageUploader from '../../../components/ImageUploader.astro';
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Curso" active="cursos">
+  <div class="page-head">
+    <h1 id="title">Curso</h1>
+    <div class="actions">
+      <a class="btn" href="/admin/cursos">Volver</a>
+      <a class="btn" id="new-edition" href="#" hidden>Nueva edición</a>
+      <button class="btn btn--danger" id="delete" type="button" hidden>Eliminar</button>
+    </div>
+  </div>
+  <form id="form" class="stack" data-id={id} novalidate>
+    <div class="card stack">
+      <div class="grid-2">
+        <div class="field"><label for="name">Nombre</label><input class="input" id="name" name="name" required /></div>
+        <div class="field"><label for="slug">Slug (URL)</label><input class="input" id="slug" name="slug" required /></div>
+        <div class="field"><label for="level">Nivel</label><input class="input" id="level" name="level" placeholder="Principiante, Intermedio…" /></div>
+        <div class="field"><label for="durationText">Duración</label><input class="input" id="durationText" name="durationText" placeholder="4 sesiones de 3 horas" /></div>
+      </div>
+      <div class="field"><label for="description">Descripción</label><textarea class="textarea" id="description" name="description"></textarea></div>
+      <div class="field"><label for="includes">Qué incluye (materiales, horneado…)</label><textarea class="textarea" id="includes" name="includes"></textarea></div>
+      <div class="field"><label for="status">Estado</label>
+        <select class="select" id="status" name="status"><option value="borrador">Borrador</option><option value="publicado">Publicado</option><option value="archivado">Archivado</option></select></div>
+    </div>
+    <div class="card"><ImageUploader folder="prometeo/courses" label="Imágenes del curso" /></div>
+    <p class="form-error" id="error" role="alert"></p>
+    <div><button class="btn btn--primary" type="submit">Guardar curso</button></div>
+  </form>
+
+  <section id="editions" hidden style="margin-top: var(--space-7)">
+    <h2 style="margin-bottom: var(--space-4)">Ediciones de este curso</h2>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Inicio</th><th>Lugar</th><th class="num">Cupos</th><th class="num">Precio</th><th>Estado</th><th></th></tr></thead><tbody id="ed-rows"></tbody></table></div>
+  </section>
+
+  <script>
+    import { slugify } from '@prometeo/shared';
+    import { $, api, errorMessage, esc, fillForm, fmtBogota, formatCop, readForm, toast } from '../../../lib/admin-client';
+    type Img = { url: string; publicId: string; alt: string | null; isPrimary: boolean };
+    type Uploader = HTMLElement & { getImages(): Img[]; setImages(i: Img[]): void; markSaved(): void };
+    const form = $<HTMLFormElement>('#form');
+    const uploader = $<Uploader>('image-uploader');
+    const error = $('#error');
+    const id = form.dataset.id && form.dataset.id !== 'nuevo' ? form.dataset.id : null;
+
+    async function init() {
+      if (!id) { $('#title').textContent = 'Nuevo curso'; return; }
+      const { item } = await api<{ item: Record<string, unknown> & { images: Img[] } }>(`/admin/courses/${id}`);
+      $('#title').textContent = String(item.name);
+      fillForm(form, item);
+      uploader.setImages(item.images);
+      $<HTMLButtonElement>('#delete').hidden = false;
+      const ne = $<HTMLAnchorElement>('#new-edition');
+      ne.hidden = false;
+      ne.href = `/admin/ediciones/nueva?curso=${id}`;
+      const eds = await api<{ items: { id: string; firstStart: string | null; location: string; occupied: number; maxSeats: number; price: number; status: string }[] }>(`/admin/editions?courseId=${id}`);
+      $('#editions').hidden = false;
+      $('#ed-rows').innerHTML = eds.items.length
+        ? eds.items.map((e) => `<tr><td>${fmtBogota(e.firstStart)}</td><td>${esc(e.location)}</td><td class="num">${e.occupied}/${e.maxSeats}</td><td class="num">${formatCop(e.price)}</td>
+            <td><span class="badge">${esc(e.status)}</span></td><td class="actions"><a class="btn btn--sm" href="/admin/ediciones/${e.id}/inscritos">Inscritos</a><a class="btn btn--sm" href="/admin/ediciones/${e.id}">Editar</a></td></tr>`).join('')
+        : '<tr><td colspan="6" class="empty">Sin ediciones todavía</td></tr>';
+    }
+    $<HTMLInputElement>('#name').addEventListener('input', (e) => {
+      const slug = $<HTMLInputElement>('#slug');
+      if (!id && !slug.dataset.touched) slug.value = slugify((e.target as HTMLInputElement).value);
+    });
+    $<HTMLInputElement>('#slug').addEventListener('input', (e) => ((e.target as HTMLElement).dataset.touched = '1'));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      const body = { ...readForm(form), description: String(readForm(form).description ?? ''), images: uploader.getImages() };
+      try {
+        const r = id ? await api<{ item: { id: string } }>(`/admin/courses/${id}`, 'PUT', body) : await api<{ item: { id: string } }>('/admin/courses', 'POST', body);
+        uploader.markSaved();
+        toast('Curso guardado');
+        if (!id) location.href = `/admin/cursos/${r.item.id}`;
+      } catch (err) { error.textContent = errorMessage(err); }
+    });
+    $('#delete').addEventListener('click', async () => {
+      if (!id || !confirm('¿Eliminar este curso? No se puede deshacer.')) return;
+      try { await api(`/admin/courses/${id}`, 'DELETE'); location.href = '/admin/cursos'; } catch (err) { toast(errorMessage(err), 'error'); }
+    });
+    void init().catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

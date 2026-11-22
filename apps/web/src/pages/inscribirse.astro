@@ -1,0 +1,207 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { formatCop } from '@prometeo/shared';
+import { apiGet, fmtDateTime, fmtDay, type CourseDetail } from '../lib/site';
+
+const slug = Astro.url.searchParams.get('curso') ?? '';
+const editionId = Astro.url.searchParams.get('edicion') ?? '';
+const res = slug ? await apiGet<{ item: CourseDetail }>(`/public/courses/${encodeURIComponent(slug)}`) : null;
+const course = res?.item;
+const edition = course?.editions.find((e) => e.id === editionId && e.open);
+if (!course || !edition) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+const modes = edition.full ? (['lista'] as const) : edition.allowedPaymentModes;
+const info: Record<string, { title: string; text: string }> = {
+  total: { title: 'Pago total ahora', text: 'Pagas el valor completo y tu cupo queda confirmado cuando se apruebe el pago. Retenemos tu cupo mientras pagas.' },
+  reserva: { title: 'Reservar y pagar después', text: `Reservamos tu cupo por ${edition.reservationHours} horas. Si no pagas a tiempo, se libera automáticamente. Te enviamos un recordatorio antes de que venza.` },
+  abono: { title: `Abono de ${formatCop(edition.depositAmount)} + saldo`, text: `Aseguras tu cupo con el abono y pagas el saldo (${formatCop(edition.price - edition.depositAmount)}) ${edition.balanceDueAt ? `antes del ${fmtDay(edition.balanceDueAt)}` : 'más adelante'}, en línea o en efectivo en el taller.` },
+  lista: { title: edition.full ? 'Lista de espera' : 'Lista sin reserva', text: 'Quedas en la lista sin ocupar cupo. Te avisamos por correo si se libera uno; solo se asegura cuando pagas y aún hay disponibles.' },
+};
+---
+
+<BaseLayout title={`Inscripción · ${course.name}`} nav="cursos" noindex cacheable={false} description={`Inscríbete a ${course.name}`}>
+  <div class="container section">
+    <nav class="crumbs" aria-label="Ruta"><a href="/cursos">Cursos</a> / <a href={`/cursos/${course.slug}`}>{course.name}</a></nav>
+    <h1>Inscripción</h1>
+    <div class="layout">
+      <form id="enroll" data-edition={edition.id} novalidate>
+        {edition.full && <p class="banner">Esta edición está llena. Puedes unirte a la lista de espera.</p>}
+        <fieldset class="modes">
+          <legend>¿Cómo quieres inscribirte?</legend>
+          {
+            modes.map((m, i) => (
+              <label class="mode">
+                <input type="radio" name="mode" value={m} checked={i === 0} />
+                <span><strong>{info[m]?.title}</strong><br /><small>{info[m]?.text}</small></span>
+              </label>
+            ))
+          }
+        </fieldset>
+        <div class="grid-2">
+          <div class="field"><label for="name">Nombre completo</label><input class="input" id="name" name="name" autocomplete="name" required /></div>
+          <div class="field"><label for="email">Correo electrónico</label><input class="input" id="email" name="email" type="email" autocomplete="email" required /></div>
+          <div class="field"><label for="phone">Teléfono / WhatsApp</label><input class="input" id="phone" name="phone" type="tel" autocomplete="tel" required /></div>
+          <div class="field"><label for="document">Documento (opcional)</label><input class="input" id="document" name="document" /></div>
+        </div>
+        <div class="hp" aria-hidden="true"><label>Sitio web<input name="website" tabindex="-1" autocomplete="off" /></label></div>
+        <label class="check">
+          <input type="checkbox" name="acceptDataPolicy" required />
+          <span>Autorizo el tratamiento de mis datos personales según la <a href="/privacidad">política de privacidad</a> (Ley 1581 de 2012) y acepto los <a href="/terminos">términos y condiciones</a>.</span>
+        </label>
+        <p class="msg" id="msg" role="alert"></p>
+        <button class="btn btn--primary" type="submit">{edition.full ? 'Unirme a la lista' : 'Confirmar inscripción'}</button>
+      </form>
+
+      <aside class="summary" aria-label="Resumen">
+        <h2>{course.name}</h2>
+        <p>{edition.firstStart ? fmtDateTime(edition.firstStart) : 'Fecha por definir'}</p>
+        <p>{edition.location}</p>
+        <p class="price">{formatCop(edition.price)}</p>
+        <p class="hint">{edition.full ? 'Sin cupos disponibles' : `${edition.seatsLeft} cupos disponibles`}</p>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    import { API_URL } from '../lib/site';
+    const form = document.getElementById('enroll') as HTMLFormElement;
+    const msg = document.getElementById('msg') as HTMLElement;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'msg';
+      msg.textContent = '';
+      const d = new FormData(form);
+      const btn = form.querySelector('button[type=submit]') as HTMLButtonElement;
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_URL}/public/enrollments`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            editionId: form.dataset.edition,
+            mode: String(d.get('mode') ?? ''),
+            name: String(d.get('name') ?? ''),
+            email: String(d.get('email') ?? ''),
+            phone: String(d.get('phone') ?? ''),
+            document: String(d.get('document') ?? ''),
+            acceptDataPolicy: d.get('acceptDataPolicy') === 'on',
+            website: String(d.get('website') ?? ''),
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { token?: string; error?: { code?: string; message?: string; fields?: { message: string }[] } };
+        if (res.ok && data.token) {
+          location.href = `/inscripcion/${data.token}`;
+          return;
+        }
+        msg.className = 'msg is-error';
+        msg.textContent = data.error?.fields?.map((f) => f.message).join(' · ') ?? data.error?.message ?? 'No se pudo completar la inscripción.';
+        if (data.error?.code === 'EDITION_FULL') {
+          const lista = form.querySelector<HTMLInputElement>('input[value=lista]');
+          if (lista) lista.checked = true;
+          msg.textContent += ' Elige «Lista» para unirte a la lista de espera.';
+        }
+      } catch {
+        msg.className = 'msg is-error';
+        msg.textContent = 'No pudimos conectar con el servidor. Intenta de nuevo.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .crumbs {
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-4);
+  }
+  h1 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-5);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 20rem;
+    gap: var(--space-7);
+    align-items: start;
+  }
+  form {
+    display: grid;
+    gap: var(--space-5);
+  }
+  .banner {
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-w) solid var(--color-line);
+    background: var(--color-surface);
+    font-weight: 600;
+  }
+  .modes {
+    border: var(--border-w) solid var(--color-line);
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-3);
+  }
+  legend {
+    font-weight: 600;
+    padding-inline: var(--space-2);
+  }
+  .mode {
+    display: flex;
+    gap: var(--space-3);
+    align-items: start;
+    padding: var(--space-3);
+    border: 1px solid var(--color-line-soft);
+    cursor: pointer;
+  }
+  .mode:has(input:checked) {
+    border-color: var(--color-ink);
+    background: var(--color-surface);
+  }
+  .mode input {
+    margin-top: 0.3rem;
+    accent-color: var(--color-ink);
+  }
+  .mode small {
+    color: var(--color-ink-soft);
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+  }
+  .msg {
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .msg.is-error {
+    color: var(--color-danger);
+  }
+  .summary {
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-2);
+    position: sticky;
+    top: 6rem;
+  }
+  .price {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+  }
+  .hint {
+    font-size: var(--text-sm);
+    color: var(--color-ink-mute);
+  }
+  @media (max-width: 800px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .summary {
+      position: static;
+      order: -1;
+    }
+  }
+</style>

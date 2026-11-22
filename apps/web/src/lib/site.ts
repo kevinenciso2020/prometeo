@@ -92,3 +92,69 @@ export function whatsappUrl(
   const full = digits.length === 10 ? `57${digits}` : digits;
   return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
 }
+
+const TZ = 'America/Bogota';
+export function fmtDateTime(value: string | Date): string {
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+    timeZone: TZ,
+  }).format(new Date(value));
+}
+export function fmtDay(value: string | Date): string {
+  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeZone: TZ }).format(
+    new Date(value),
+  );
+}
+export function fmtTime(value: string | Date): string {
+  return new Intl.DateTimeFormat('es-CO', { timeStyle: 'short', timeZone: TZ }).format(
+    new Date(value),
+  );
+}
+
+export type PaymentModeKey = 'total' | 'reserva' | 'abono' | 'lista';
+export interface CourseListItem {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  level: string | null;
+  durationText: string | null;
+  image: string | null;
+  fromPrice: number | null;
+  nextEdition: {
+    id: string;
+    startsAt: string | null;
+    seatsLeft: number;
+    price: number;
+    full: boolean;
+  } | null;
+}
+export interface PublicEdition {
+  id: string;
+  location: string;
+  instructor: string | null;
+  price: number;
+  maxSeats: number;
+  seatsLeft: number;
+  enrollmentDeadline: string;
+  allowedPaymentModes: PaymentModeKey[];
+  reservationHours: number;
+  depositAmount: number;
+  balanceDueAt: string | null;
+  open: boolean;
+  full: boolean;
+  sessions: { startsAt: string; endsAt: string }[];
+  firstStart: string | null;
+}
+export interface CourseDetail {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  level: string | null;
+  durationText: string | null;
+  includes: string | null;
+  images: { url: string; alt: string | null }[];
+  editions: PublicEdition[];
+}

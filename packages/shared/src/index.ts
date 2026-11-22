@@ -6,3 +6,5 @@ export * from './cloudinary';
 export * from './schemas/catalog';
 export * from './shipping';
 export * from './schemas/public';
+export * from './enrollment';
+export * from './schemas/courses';

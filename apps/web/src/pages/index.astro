@@ -2,14 +2,16 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Picture from '../components/Picture.astro';
 import ProductCard from '../components/ProductCard.astro';
-import { apiGet, SITE_URL, type CategoryData, type Paged, type ProductCardData, type ServiceData } from '../lib/site';
+import { apiGet, fmtDay, SITE_URL, type CategoryData, type CourseListItem, type Paged, type ProductCardData, type ServiceData } from '../lib/site';
 import { ogImage } from '../lib/images';
 
-const [featured, categories, services] = await Promise.all([
+const [featured, categories, services, courses] = await Promise.all([
   apiGet<Paged<ProductCardData>>('/public/products?featured=true&pageSize=4'),
   apiGet<{ items: CategoryData[] }>('/public/categories'),
   apiGet<{ items: ServiceData[] }>('/public/services'),
+  apiGet<{ items: CourseListItem[] }>('/public/courses'),
 ]);
+const upcoming = (courses?.items ?? []).filter((c) => c.nextEdition).slice(0, 3);
 const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
 ---
 
@@ -73,13 +75,33 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
     )
   }
 
-  <section class="band">
-    <div class="container band__in">
-      <h2>Aprende a trabajar el barro</h2>
-      <p>Muy pronto abriremos las inscripciones a nuestros cursos de cerámica. Escríbenos para enterarte primero.</p>
-      <a class="btn" href="/contacto">Quiero que me avisen</a>
-    </div>
-  </section>
+  {
+    upcoming.length > 0 ? (
+      <section class="section container">
+        <div class="head"><h2>Próximos cursos</h2><a class="link-arrow" href="/cursos">Ver todos →</a></div>
+        <ul class="svc" role="list">
+          {upcoming.map((c) => (
+            <li>
+              <a href={`/cursos/${c.slug}`}>
+                <p class="eyebrow">{c.nextEdition?.startsAt ? fmtDay(c.nextEdition.startsAt) : 'Próximamente'}</p>
+                <h3>{c.name}</h3>
+                <p>{c.nextEdition?.full ? 'Lista de espera' : `${c.nextEdition?.seatsLeft} cupos disponibles`}</p>
+                <span class="link-arrow">Ver edición →</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : (
+      <section class="band">
+        <div class="container band__in">
+          <h2>Aprende a trabajar el barro</h2>
+          <p>Muy pronto abriremos las inscripciones a nuestros cursos de cerámica. Escríbenos para enterarte primero.</p>
+          <a class="btn" href="/contacto">Quiero que me avisen</a>
+        </div>
+      </section>
+    )
+  }
 </BaseLayout>
 
 <style>

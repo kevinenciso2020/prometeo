@@ -125,6 +125,11 @@ export const enrollments = pgTable(
     reservedUntil: tstz('reserved_until'),
     balanceDueAt: tstz('balance_due_at'),
     waitlistNotifiedAt: tstz('waitlist_notified_at'),
+    // Marcas de idempotencia para los recordatorios de los cron.
+    reservationReminderSentAt: tstz('reservation_reminder_sent_at'),
+    balanceReminderSentAt: tstz('balance_reminder_sent_at'),
+    /** Inicio de la última sesión de la que ya se envió recordatorio (uno por sesión). */
+    lastSessionReminderFor: tstz('last_session_reminder_for'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

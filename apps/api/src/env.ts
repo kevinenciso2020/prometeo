@@ -2,6 +2,7 @@ import type { Db } from '@prometeo/db';
 import type { Role } from '@prometeo/shared';
 import type { CloudinaryClient } from './lib/cloudinary';
 import type { Mailer } from './lib/mailer';
+import type { PoolOpener } from './lib/tx';
 
 export interface Bindings {
   // Secretos
@@ -30,6 +31,7 @@ export interface AuthUser {
 export interface Variables {
   db: Db;
   mailer: Mailer;
+  openPool: PoolOpener;
   cloudinary: CloudinaryClient;
   user?: AuthUser;
 }

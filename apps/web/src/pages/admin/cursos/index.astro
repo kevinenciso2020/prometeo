@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Cursos" active="cursos">
+  <div class="page-head">
+    <h1>Cursos</h1>
+    <a class="btn btn--primary" href="/admin/cursos/nuevo">Nuevo curso</a>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Curso</th><th>Nivel</th><th class="num">Ediciones</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <script>
+    import { $, api, errorMessage, esc, toast } from '../../../lib/admin-client';
+    interface Row { id: string; name: string; level: string | null; status: string; editions: number }
+    void api<{ items: Row[] }>('/admin/courses?pageSize=100')
+      .then((r) => {
+        $('#rows').innerHTML = r.items.length
+          ? r.items.map((x) => `<tr><td><a href="/admin/cursos/${x.id}"><strong>${esc(x.name)}</strong></a></td><td>${esc(x.level ?? '—')}</td><td class="num">${x.editions}</td>
+              <td><span class="badge ${x.status === 'publicado' ? 'badge--solid' : 'badge--mute'}">${esc(x.status)}</span></td>
+              <td class="actions"><a class="btn btn--sm" href="/admin/cursos/${x.id}">Editar</a></td></tr>`).join('')
+          : '<tr><td colspan="5" class="empty">Aún no hay cursos</td></tr>';
+      })
+      .catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

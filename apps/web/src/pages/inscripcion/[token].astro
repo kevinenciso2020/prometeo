@@ -1,0 +1,189 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { formatCop } from '@prometeo/shared';
+import { apiGet, fmtDateTime, fmtTime, getSettings, whatsappUrl } from '../../lib/site';
+
+interface Status {
+  enrollment: { status: string; paymentMode: string; paymentModeLabel: string; totalAmount: number; paidAmount: number; pendingAmount: number; reservedUntil: string | null; balanceDueAt: string | null; name: string; email: string };
+  course: { name: string; slug: string };
+  edition: { location: string; instructor: string | null; seatsLeft: number; canSecure: boolean; allowedPaymentModes: string[]; depositAmount: number; sessions: { startsAt: string; endsAt: string }[] } | null;
+}
+
+const { token } = Astro.params;
+const res = await apiGet<Status>(`/public/enrollments/${encodeURIComponent(token ?? '')}`);
+if (!res) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+const { enrollment: e, course, edition } = res;
+const settings = await getSettings();
+const wa = whatsappUrl(settings.contact.whatsapp, `Hola, escribo por mi inscripción a ${course.name}`);
+
+const steps: Record<string, { title: string; text: string }> = {
+  lista: { title: 'En lista', text: 'Estás en la lista, sin cupo reservado. Te avisaremos por correo si se libera un cupo.' },
+  reservada: { title: 'Cupo reservado', text: 'Tu cupo está reservado. Debes completar el pago antes de la fecha indicada para conservarlo.' },
+  abonada: { title: 'Cupo asegurado (abono recibido)', text: 'Recibimos tu abono y tu cupo está asegurado. Falta pagar el saldo.' },
+  pagada: { title: '¡Cupo confirmado!', text: 'Recibimos el pago completo. ¡Te esperamos!' },
+  vencida: { title: 'Reserva vencida', text: 'La reserva venció y el cupo fue liberado. Puedes inscribirte de nuevo si aún hay cupos.' },
+  cancelada: { title: 'Inscripción cancelada', text: 'Esta inscripción fue cancelada.' },
+};
+const step = steps[e.status] ?? { title: e.status, text: '' };
+const payable = ['reservada', 'abonada'].includes(e.status) && e.pendingAmount > 0;
+---
+
+<BaseLayout title="Mi inscripción" nav="cursos" noindex cacheable={false} description="Estado de tu inscripción">
+  <div class="container section">
+    <p class="eyebrow">{course.name}</p>
+    <h1>{step.title}</h1>
+    <p class="lead">{step.text}</p>
+
+    <div class="layout">
+      <div class="card-box">
+        <h2>Detalle</h2>
+        <dl>
+          <dt>A nombre de</dt><dd>{e.name} · {e.email}</dd>
+          <dt>Modalidad</dt><dd>{e.paymentModeLabel}</dd>
+          <dt>Total</dt><dd>{formatCop(e.totalAmount)}</dd>
+          <dt>Pagado</dt><dd>{formatCop(e.paidAmount)}</dd>
+          <dt>Pendiente</dt><dd><strong>{formatCop(e.pendingAmount)}</strong></dd>
+          {e.reservedUntil && e.status === 'reservada' && (<Fragment><dt>Cupo retenido hasta</dt><dd>{fmtDateTime(e.reservedUntil)}</dd></Fragment>)}
+          {e.balanceDueAt && e.status === 'abonada' && (<Fragment><dt>Saldo antes de</dt><dd>{fmtDateTime(e.balanceDueAt)}</dd></Fragment>)}
+        </dl>
+        {payable && (
+          <p class="note">El pago en línea con Wompi se habilitará pronto en esta página. Mientras tanto puedes pagar en efectivo o por transferencia coordinando con el taller{wa && <Fragment> por <a href={wa} target="_blank" rel="noopener">WhatsApp</a></Fragment>}; registraremos tu pago y te confirmaremos por correo.</p>
+        )}
+      </div>
+
+      {edition && (
+        <div class="card-box">
+          <h2>Clases</h2>
+          <ul role="list" class="sessions">
+            {edition.sessions.map((s) => <li>{fmtDateTime(s.startsAt)} – {fmtTime(s.endsAt)}</li>)}
+          </ul>
+          <p>{edition.location}{edition.instructor ? ` · ${edition.instructor}` : ''}</p>
+        </div>
+      )}
+    </div>
+
+    {
+      edition?.canSecure && (
+        <section class="secure" id="secure" data-token={token}>
+          <h2>¡Hay cupo disponible!</h2>
+          <p>Asegúralo ahora: se entrega a quien confirme primero.</p>
+          <div class="secure__opts">
+            {edition.allowedPaymentModes.filter((m) => m !== 'lista').map((m) => (
+              <button class="btn btn--primary" type="button" data-mode={m}>
+                {m === 'total' ? 'Pagar completo' : m === 'reserva' ? 'Reservar y pagar después' : `Abonar ${formatCop(edition.depositAmount)}`}
+              </button>
+            ))}
+          </div>
+          <p class="msg" id="secure-msg" role="alert"></p>
+        </section>
+      )
+    }
+
+    <p class="back"><a href={`/cursos/${course.slug}`}>← Ver el curso</a></p>
+  </div>
+
+  <script>
+    import { API_URL } from '../../lib/site';
+    const box = document.getElementById('secure');
+    const msg = document.getElementById('secure-msg');
+    box?.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!msg) return;
+        msg.textContent = '';
+        btn.disabled = true;
+        try {
+          const res = await fetch(`${API_URL}/public/enrollments/${box.dataset.token}/secure`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: btn.dataset.mode }),
+          });
+          if (res.ok) return location.reload();
+          const d = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+          msg.textContent = d.error?.message ?? 'No se pudo asegurar el cupo.';
+        } catch {
+          msg.textContent = 'No pudimos conectar con el servidor.';
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-block: var(--space-2) var(--space-3);
+  }
+  .lead {
+    font-size: var(--text-lg);
+    max-width: 40rem;
+    margin-bottom: var(--space-6);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: var(--space-5);
+    align-items: start;
+  }
+  .card-box {
+    border: var(--border-w) solid var(--color-line);
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-3);
+  }
+  dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-2) var(--space-5);
+    font-size: var(--text-sm);
+    margin: 0;
+  }
+  dt {
+    font-weight: 600;
+  }
+  dd {
+    margin: 0;
+  }
+  .sessions {
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+  }
+  .note {
+    font-size: var(--text-sm);
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line-soft);
+  }
+  .secure {
+    margin-top: var(--space-6);
+    padding: var(--space-5);
+    border: var(--border-w) solid var(--color-line);
+    box-shadow: var(--shadow-hard);
+    display: grid;
+    gap: var(--space-3);
+  }
+  .secure__opts {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .msg {
+    color: var(--color-danger);
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .back {
+    margin-top: var(--space-6);
+  }
+  @media (max-width: 800px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

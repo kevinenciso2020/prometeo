@@ -50,6 +50,7 @@ export async function createTestContext() {
     getDb: () => db,
     getMailer: () => mailer,
     getCloudinary: () => cloudinary,
+    getPool: () => () => ({ db, close: async () => undefined }),
   });
 
   let ipCounter = 0;
@@ -69,7 +70,8 @@ export async function createTestContext() {
     request(path, { method: 'PUT', body: JSON.stringify(body), cookies });
   const login = async (email: string, password = 'clave-segura-123') =>
     cookieHeader(await post('/auth/login', { email, password }));
-  return { db, app, outbox, request, post, put, login, destroyed };
+  const open = () => ({ db, close: async () => undefined });
+  return { db, app, outbox, request, post, put, login, destroyed, mailer, open };
 }
 
 export function setCookies(res: Response): string[] {

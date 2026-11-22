@@ -7,11 +7,8 @@ import {
   quoteRequests,
   serviceImages,
   services,
-  siteSettings,
-  type Db,
 } from '@prometeo/db';
 import {
-  DEFAULT_SETTINGS,
   cartQuoteSchema,
   computeShipping,
   publicProductsQuerySchema,
@@ -24,6 +21,7 @@ import { pageInfo } from '../lib/pagination';
 import { validate } from '../lib/validate';
 import { rateLimit } from '../middleware/rate-limit';
 import { AuthError } from '../services/auth.service';
+import { loadSettings } from '../services/settings';
 
 /** Endpoints públicos (sin sesión). Solo exponen contenido publicado. */
 export const publicRoutes = new Hono<AppEnv>();
@@ -31,7 +29,8 @@ export const publicRoutes = new Hono<AppEnv>();
 // Caché corta en CDN/navegador solo para lecturas.
 publicRoutes.use('*', async (c, next) => {
   await next();
-  if (c.req.method === 'GET' && c.res.status === 200) {
+  // No pisa un Cache-Control definido por la ruta (p. ej. estado de inscripción: private, no-store).
+  if (c.req.method === 'GET' && c.res.status === 200 && !c.res.headers.has('Cache-Control')) {
     c.res.headers.set(
       'Cache-Control',
       'public, max-age=30, s-maxage=60, stale-while-revalidate=120',
@@ -48,13 +47,6 @@ const primaryImage = (kind: 'product' | 'service') =>
     : sql<
         string | null
       >`(select i.url from service_images i where i.service_id = "services"."id" order by i.is_primary desc, i.sort_order asc limit 1)`;
-
-async function loadSettings(db: Db) {
-  const rows = await db.select().from(siteSettings);
-  const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };
-  for (const r of rows) merged[r.key] = r.value;
-  return merged as typeof DEFAULT_SETTINGS & Record<string, unknown>;
-}
 
 publicRoutes.get('/settings', async (c) => c.json({ settings: await loadSettings(c.get('db')) }));
 

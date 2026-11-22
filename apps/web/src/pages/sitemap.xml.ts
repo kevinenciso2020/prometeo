@@ -3,6 +3,7 @@ import {
   SITE_URL,
   apiGet,
   type CategoryData,
+  type CourseListItem,
   type Paged,
   type ProductCardData,
   type ServiceData,
@@ -14,6 +15,7 @@ export const GET: APIRoute = async () => {
   const urls: string[] = [
     '/',
     '/tienda',
+    '/cursos',
     '/servicios',
     '/el-taller',
     '/contacto',
@@ -22,6 +24,8 @@ export const GET: APIRoute = async () => {
     '/envios-y-devoluciones',
   ];
 
+  const courses = await apiGet<{ items: CourseListItem[] }>('/public/courses');
+  courses?.items.forEach((c) => urls.push(`/cursos/${c.slug}`));
   const [cats, services] = await Promise.all([
     apiGet<{ items: CategoryData[] }>('/public/categories'),
     apiGet<{ items: ServiceData[] }>('/public/services'),

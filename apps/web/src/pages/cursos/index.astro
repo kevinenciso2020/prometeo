@@ -1,0 +1,96 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Picture from '../../components/Picture.astro';
+import { formatCop } from '@prometeo/shared';
+import { apiGet, fmtDay, type CourseListItem } from '../../lib/site';
+
+const res = await apiGet<{ items: CourseListItem[] }>('/public/courses');
+---
+
+<BaseLayout title="Cursos de cerámica" nav="cursos" description="Aprende cerámica con nosotros: cursos de torno y modelado a mano para todos los niveles, con materiales y horneado incluidos.">
+  <div class="container section">
+    <h1>Cursos</h1>
+    <p class="lead">Aprende a trabajar el barro con acompañamiento cercano. Cupos limitados por grupo.</p>
+    {
+      res === null ? (
+        <p class="state" role="alert">No pudimos cargar los cursos. Intenta de nuevo en unos minutos.</p>
+      ) : res.items.length === 0 ? (
+        <p class="state">Pronto abriremos nuevos cursos. <a href="/contacto">Escríbenos</a> y te avisamos.</p>
+      ) : (
+        <ul class="list" role="list">
+          {res.items.map((c, i) => (
+            <li>
+              <a href={`/cursos/${c.slug}`}>
+                <Picture src={c.image} alt={c.name} ratio="4 / 3" sizes="(min-width: 60rem) 30vw, 90vw" eager={i < 2} />
+                <div class="body">
+                  {c.level && <p class="eyebrow">{c.level}{c.durationText ? ` · ${c.durationText}` : ''}</p>}
+                  <h2>{c.name}</h2>
+                  <p>{c.description.slice(0, 130)}{c.description.length > 130 ? '…' : ''}</p>
+                  {c.nextEdition ? (
+                    <p class="meta">
+                      Próxima edición: {c.nextEdition.startsAt ? fmtDay(c.nextEdition.startsAt) : 'por definir'} ·
+                      {c.nextEdition.full ? ' lista de espera' : ` ${c.nextEdition.seatsLeft} ${c.nextEdition.seatsLeft === 1 ? 'cupo' : 'cupos'}`}
+                      {c.fromPrice !== null && ` · desde ${formatCop(c.fromPrice)}`}
+                    </p>
+                  ) : (
+                    <p class="meta muted">Sin ediciones abiertas por ahora</p>
+                  )}
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+  }
+  .lead {
+    font-size: var(--text-lg);
+    max-width: 40rem;
+    margin-block: var(--space-3) var(--space-6);
+  }
+  .list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: var(--space-6);
+    padding: 0;
+  }
+  .list a {
+    display: grid;
+    border: var(--border-w) solid var(--color-line);
+    text-decoration: none;
+    height: 100%;
+    transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  }
+  .list a:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-hard);
+  }
+  .body {
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-2);
+    align-content: start;
+  }
+  h2 {
+    font-size: var(--text-xl);
+  }
+  .meta {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .muted {
+    color: var(--color-ink-mute);
+    font-weight: 400;
+  }
+  .state {
+    padding: var(--space-7);
+    text-align: center;
+    border: var(--border-w) dashed var(--color-line);
+  }
+</style>

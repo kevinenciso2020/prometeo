@@ -1,25 +1,22 @@
 import { Hono } from 'hono';
 import { sql } from 'drizzle-orm';
 import { siteSettings } from '@prometeo/db';
-import { DEFAULT_SETTINGS, settingsSchema } from '@prometeo/shared';
+import { settingsSchema } from '@prometeo/shared';
+import { loadSettings } from '../../services/settings';
 import type { AppEnv } from '../../env';
 import { writeAudit } from '../../lib/audit';
 import { validate } from '../../lib/validate';
 
 export const settingsRoutes = new Hono<AppEnv>();
 
-async function loadSettings(c: { get: (k: 'db') => AppEnv['Variables']['db'] }) {
-  const rows = await c.get('db').select().from(siteSettings);
-  const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };
-  for (const r of rows) merged[r.key] = r.value;
-  return merged;
-}
+const loadSettingsFor = (c: { get: (k: 'db') => AppEnv['Variables']['db'] }) =>
+  loadSettings(c.get('db'));
 
-settingsRoutes.get('/', async (c) => c.json({ settings: await loadSettings(c) }));
+settingsRoutes.get('/', async (c) => c.json({ settings: await loadSettingsFor(c) }));
 
 settingsRoutes.put('/', validate('json', settingsSchema), async (c) => {
   const db = c.get('db');
-  const before = await loadSettings(c);
+  const before = await loadSettingsFor(c);
   const input = c.req.valid('json');
   for (const [key, value] of Object.entries(input)) {
     if (value === undefined) continue;
@@ -40,5 +37,5 @@ settingsRoutes.put('/', validate('json', settingsSchema), async (c) => {
       },
     });
   }
-  return c.json({ settings: await loadSettings(c) });
+  return c.json({ settings: await loadSettingsFor(c) });
 });
