@@ -6,7 +6,7 @@ Tienda y escuela de cerámica artesanal: catálogo, carrito y pagos con Wompi, c
 
 ## Desarrollo local
 
-Requisitos: Node 22 (`.nvmrc`) y pnpm.
+Requisitos: Node ≥ 22.23.4 (Astro 7; `.nvmrc` apunta a la última 22.x) y pnpm.
 
 ```bash
 pnpm install

@@ -1,4 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
+import { cacheControlFor } from './lib/cache-control';
 import { applySecurityHeaders } from './lib/security-headers';
 
 const API = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
@@ -49,6 +50,10 @@ const guard = defineMiddleware(async (context, next) => {
   return response;
 });
 
-export const onRequest = defineMiddleware(async (context, next) =>
-  applySecurityHeaders((await guard(context, next)) as Response, API, import.meta.env.PROD),
-);
+export const onRequest = defineMiddleware(async (context, next) => {
+  const response = (await guard(context, next)) as Response;
+  if (!response.headers.has('Cache-Control')) {
+    response.headers.set('Cache-Control', cacheControlFor(context.url.pathname, response.status));
+  }
+  return applySecurityHeaders(response, API, import.meta.env.PROD);
+});

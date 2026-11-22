@@ -25,11 +25,10 @@ Revisión punto por punto de la sección 5 del alcance. Estado: ✅ cumple y ver
 - **Cabeceras de la API vs. front:** el front no se sirve desde la API, por eso cada Worker tiene su política.
 - **Honeypot** en checkout e inscripción (anti-bots) además del rate limiting.
 
-## Dependencias (`pnpm audit --prod`, 17 hallazgos: 3 críticos, 3 altos)
+## Dependencias (`pnpm audit --prod`)
+Tras actualizar a **Astro 7.4 / @astrojs/cloudflare 14.4** pasaron de 17 hallazgos (3 críticos, 3 altos) a **5 (2 críticos, 3 moderados)**. Se cerraron el RCE de Astro y las alertas de `sharp`.
 
-- **astro (crítico, RCE vía optimización AVIF), sharp (alto):** requieren usar `astro:assets`/servicio de imágenes. El proyecto **no lo usa** (las imágenes son de Cloudinary con un componente propio), así que no es alcanzable hoy. El parche está en Astro ≥ 7.2.8 / `@astrojs/cloudflare` 14: es un **salto de versión mayor** que conviene hacer como tarea aparte con pruebas (build, SSR, middleware).
-- **tinypool (crítico):** llega por la cadena de herramientas de build (wrangler → vite), no por código ejecutado en producción.
-- Acción recomendada: planificar la actualización a Astro 7 y activar Dependabot.
+Quedan `tinypool` (crítico) y `vitest`/`@vitest/mocker` (moderados), todos bajo `wrangler > @cloudflare/workers-utils > vitest`: es una herramienta interna de wrangler que no se ejecuta en el Worker en producción ni en nuestro build. Forzar un override de versión mayor arriesga romper el tooling; se resolverá cuando wrangler actualice su dependencia. Acción recomendada: activar Dependabot y revisar tras cada actualización de wrangler.
 
 ## Qué NO se ha verificado (límites honestos)
 
