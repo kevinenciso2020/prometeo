@@ -40,7 +40,6 @@ const HERO_PHOTO = '/img/hero-torno.jpg';
       </div>
       <div class="hero__frame">
         <Picture src={HERO_PHOTO} alt="Manos de alfarero dando forma al barro sobre el torno" ratio="4 / 5" width={1024} sizes="(min-width: 60rem) 40vw, 90vw" eager class="hero__pic" />
-        <p class="hero__seal" aria-hidden="true"><span>Hecho</span><span>a mano</span></p>
       </div>
     </div>
   </section>
@@ -149,24 +148,6 @@ const HERO_PHOTO = '/img/hero-torno.jpg';
   .hero__frame {
     position: relative;
   }
-  .hero__seal {
-    position: absolute;
-    left: -1.5rem;
-    bottom: 2rem;
-    display: grid;
-    place-content: center;
-    width: 6.25rem;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: var(--color-red);
-    border: var(--border-w) solid var(--color-ink);
-    color: #fff;
-    font-family: var(--font-display);
-    font-size: var(--text-lg);
-    line-height: 1.05;
-    text-align: center;
-    transform: rotate(-9deg);
-  }
   .hero__in {
     display: grid;
     grid-template-columns: 1.1fr 0.9fr;
@@ -224,7 +205,7 @@ const HERO_PHOTO = '/img/hero-torno.jpg';
     outline-color: var(--color-inverse-ink);
   }
   .kiln {
-    margin-top: var(--space-8);
+    margin-top: var(--section-y);
     border-block: var(--border-w) solid var(--color-line);
     background:
       linear-gradient(90deg, rgb(58 34 24 / 0.92) 0%, rgb(58 34 24 / 0.78) 45%, rgb(58 34 24 / 0.15) 100%),
@@ -232,7 +213,7 @@ const HERO_PHOTO = '/img/hero-torno.jpg';
     color: var(--color-inverse-ink);
   }
   .kiln__in {
-    padding-block: var(--space-8);
+    padding-block: var(--section-y);
   }
   .kiln__text {
     display: grid;
@@ -304,12 +285,6 @@ const HERO_PHOTO = '/img/hero-torno.jpg';
     .hero__in {
       grid-template-columns: 1fr;
       gap: var(--space-5);
-    }
-    .hero__seal {
-      left: auto;
-      right: -0.5rem;
-      width: 5rem;
-      font-size: var(--text-base);
     }
   }
 </style>

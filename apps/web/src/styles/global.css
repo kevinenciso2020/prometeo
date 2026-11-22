@@ -203,7 +203,7 @@ h2 {
   margin-inline: auto;
 }
 .section {
-  padding-block: var(--space-8);
+  padding-block: var(--section-y);
 }
 .eyebrow {
   font-size: var(--text-xs);

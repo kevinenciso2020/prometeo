@@ -21,6 +21,7 @@ const links = [
         {links.map((l) => (
           <li><a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.label}</a></li>
         ))}
+        <li class="nav__acct"><a href="/mi-cuenta">Mi cuenta</a></li>
       </ul>
     </nav>
     <a class="acct" href="/mi-cuenta">Mi cuenta</a>
@@ -29,6 +30,31 @@ const links = [
     </a>
   </div>
 </header>
+
+<script>
+  const btn = document.getElementById('menu-btn');
+  const nav = document.getElementById('nav');
+  if (btn && nav) {
+    const setOpen = (open: boolean) => {
+      nav.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', String(open));
+      btn.textContent = open ? 'Cerrar' : 'Menú';
+    };
+    btn.addEventListener('click', () => setOpen(!nav.classList.contains('is-open')));
+    nav.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('a')) setOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && nav.classList.contains('is-open')) {
+        setOpen(false);
+        btn.focus();
+      }
+    });
+    window.matchMedia('(min-width: 961px)').addEventListener('change', (e) => {
+      if (e.matches) setOpen(false);
+    });
+  }
+</script>
 
 <style>
   .head {
@@ -52,6 +78,9 @@ const links = [
   }
   .nav {
     margin-left: auto;
+  }
+  .nav__acct {
+    display: none;
   }
   .nav ul {
     display: flex;
@@ -85,9 +114,17 @@ const links = [
     display: none;
     margin-left: auto;
   }
-  @media (max-width: 760px) {
+  /* Tablet y móvil: el menú se colapsa antes de que los 5 enlaces se apretujen. */
+  @media (max-width: 960px) {
+    .head__in {
+      gap: var(--space-3);
+    }
     .menu-btn {
       display: inline-flex;
+    }
+    .menu-btn,
+    .cart {
+      min-height: 2.5rem;
     }
     .nav {
       display: none;
@@ -95,31 +132,30 @@ const links = [
       inset: 100% 0 auto 0;
       background: var(--color-bg);
       border-bottom: var(--border-w) solid var(--color-line);
-      padding: var(--space-4);
+      padding: var(--space-3) var(--space-4);
     }
     .nav.is-open {
       display: block;
     }
     .nav ul {
       flex-direction: column;
-      gap: var(--space-3);
+      gap: 0;
+    }
+    .nav a {
+      display: block;
+      padding-block: var(--space-3);
+    }
+  }
+  /* Móvil angosto: «Mi cuenta» pasa al menú para que todo quepa desde 320px. */
+  @media (max-width: 520px) {
+    .acct {
+      display: none;
+    }
+    .nav__acct {
+      display: block;
+    }
+    .logo {
+      font-size: var(--text-lg);
     }
   }
 </style>
-
-<script>
-  import { cartCount } from '../lib/cart';
-  const out = document.getElementById('cart-count');
-  const sync = () => {
-    if (out) out.textContent = String(cartCount());
-  };
-  sync();
-  window.addEventListener('cart:change', sync);
-  window.addEventListener('storage', sync);
-  const btn = document.getElementById('menu-btn');
-  const nav = document.getElementById('nav');
-  btn?.addEventListener('click', () => {
-    const open = nav?.classList.toggle('is-open') ?? false;
-    btn.setAttribute('aria-expanded', String(open));
-  });
-</script>

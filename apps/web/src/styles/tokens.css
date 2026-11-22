@@ -38,8 +38,8 @@
   --text-base: 1rem;
   --text-lg: 1.25rem;
   --text-xl: 1.75rem;
-  --text-2xl: 2.5rem;
-  --text-3xl: clamp(2.5rem, 6vw, 4.5rem);
+  --text-2xl: clamp(1.875rem, 1.2rem + 3vw, 2.5rem);
+  --text-3xl: clamp(2.25rem, 1rem + 6vw, 4.5rem);
   --leading-tight: 1.1;
   --leading-body: 1.55;
 
@@ -65,4 +65,12 @@
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --dur: 140ms;
   --container: 72rem;
+  --section-y: clamp(3rem, 2rem + 4vw, 5rem);
+}
+
+/* Pantallas muy anchas: el contenido respira un poco más. */
+@media (min-width: 1700px) {
+  :root {
+    --container: 84rem;
+  }
 }
