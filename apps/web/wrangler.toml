@@ -1,6 +1,11 @@
 name = "prometeo-web"
 compatibility_date = "2025-09-01"
-# La configuración final de despliegue (assets/main del adaptador) se cierra en la Fase 3/7.
+# El adaptador de Astro genera dist/server/wrangler.json (main + assets) al compilar;
+# `wrangler deploy` desde apps/web usa esa configuración.
+# Dominio: en el dashboard de Cloudflare (Workers > prometeo-web > Domains) o descomenta:
+# routes = [{ pattern = "www.tudominio.com", custom_domain = true }]
 
 [vars]
+# OJO: Astro incrusta PUBLIC_API_URL en el BUILD. En producción defínela como variable de
+# entorno al compilar (en CI: vars.PUBLIC_API_URL), no solo aquí.
 PUBLIC_API_URL = "http://localhost:8787"

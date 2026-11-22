@@ -9,6 +9,7 @@
   "scripts": {
     "generate": "drizzle-kit generate",
     "migrate": "node --env-file=../../.env ../../node_modules/.pnpm/node_modules/drizzle-kit/bin.cjs migrate",
+    "migrate:ci": "drizzle-kit migrate",
     "seed": "tsx --env-file=../../.env seed/index.ts",
     "typecheck": "tsc -p tsconfig.json"
   },

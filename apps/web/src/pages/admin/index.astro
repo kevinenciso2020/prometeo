@@ -6,10 +6,24 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
   <div class="page-head">
     <h1>Panel</h1>
   </div>
+  <h2 style="margin-bottom: var(--space-4)">Operación · últimos 30 días</h2>
   <div class="stats">
+    <div class="card stat"><span>Ventas aprobadas</span><strong id="d-sales">–</strong></div>
+    <div class="card stat"><span>Pagos aprobados</span><strong id="d-payments">–</strong></div>
+    <div class="card stat"><span>Pedidos por atender</span><strong id="d-pending">–</strong></div>
+    <div class="card stat"><span>Pedidos a revisar</span><strong id="d-review">–</strong></div>
+    <div class="card stat"><span>Inscripciones activas</span><strong id="d-enr">–</strong></div>
+    <div class="card stat"><span>Ediciones abiertas</span><strong id="d-editions">–</strong></div>
+    <div class="card stat"><span>Clientes nuevos</span><strong id="d-customers">–</strong></div>
+  </div>
+  <div class="stats" style="margin-top: var(--space-4)">
     <div class="card stat"><span>Productos</span><strong id="n-products">–</strong></div>
     <div class="card stat"><span>Categorías</span><strong id="n-categories">–</strong></div>
     <div class="card stat"><span>Servicios</span><strong id="n-services">–</strong></div>
+  </div>
+  <h2 style="margin-top: var(--space-7); margin-bottom: var(--space-4)">Actividad sensible reciente</h2>
+  <div class="table-wrap">
+    <table class="table"><thead><tr><th>Fecha</th><th>Acción</th><th>Entidad</th></tr></thead><tbody id="d-audit"></tbody></table>
   </div>
   <h2 style="margin-top: var(--space-7); margin-bottom: var(--space-4)">Campañas · últimos 30 días</h2>
   <div class="stats">
@@ -21,9 +35,6 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
   <div class="table-wrap" style="margin-top: var(--space-4)">
     <table class="table"><thead><tr><th>Mejores campañas</th><th class="num">Impresiones</th><th class="num">Clics</th><th class="num">CTR</th></tr></thead><tbody id="m-top"></tbody></table>
   </div>
-  <p class="hint" style="margin-top: var(--space-6); color: var(--color-ink-mute)">
-    Ventas, pedidos, ediciones e inscripciones se sumarán al panel en las próximas fases.
-  </p>
   <script>
     import { api } from '../../lib/admin-client';
     const set = (id: string, n: number) => {
@@ -38,6 +49,22 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
       if (body) body.replaceChildren(...(m.top.length ? m.top : [{ name: 'Sin datos todavía', impressions: 0, clicks: 0, ctr: 0 }]).map((t) => {
         const tr = document.createElement('tr');
         for (const [i, v] of [t.name, String(t.impressions), String(t.clicks), `${t.ctr}%`].entries()) { const td = document.createElement('td'); td.textContent = v; if (i > 0) td.className = 'num'; tr.append(td); }
+        return tr;
+      }));
+    }).catch(() => undefined);
+    interface D { sales: { total: number; payments: number }; orders: { byStatus: Record<string, number>; needsReview: number }; enrollments: { byStatus: Record<string, number>; openEditions: number }; newCustomers: number; recentAudit: { id: string; action: string; entityType: string; entityId: string | null; createdAt: string }[] }
+    const cop = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+    void api<D>('/admin/dashboard').then((d) => {
+      text('d-sales', cop(d.sales.total)); set('d-payments', d.sales.payments);
+      set('d-pending', (d.orders.byStatus.pendiente_pago ?? 0) + (d.orders.byStatus.pagado ?? 0) + (d.orders.byStatus.preparando ?? 0));
+      set('d-review', d.orders.needsReview);
+      set('d-enr', (d.enrollments.byStatus.reservada ?? 0) + (d.enrollments.byStatus.abonada ?? 0) + (d.enrollments.byStatus.pagada ?? 0));
+      set('d-editions', d.enrollments.openEditions); set('d-customers', d.newCustomers);
+      const body = document.getElementById('d-audit');
+      if (body) body.replaceChildren(...(d.recentAudit.length ? d.recentAudit : [null]).map((r) => {
+        const tr = document.createElement('tr');
+        const cells = r ? [new Date(r.createdAt).toLocaleString('es-CO'), r.action, `${r.entityType}${r.entityId ? ' · ' + r.entityId.slice(0, 8) : ''}`] : ['Sin actividad todavía', '', ''];
+        for (const v of cells) { const td = document.createElement('td'); td.textContent = v; tr.append(td); }
         return tr;
       }));
     }).catch(() => undefined);

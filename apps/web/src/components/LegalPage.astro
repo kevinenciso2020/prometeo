@@ -1,9 +1,12 @@
 ---
+import { LEGAL_DEFAULTS } from '../lib/legal-defaults';
 interface Props {
   text: string;
+  kind?: keyof typeof LEGAL_DEFAULTS;
 }
-const { text } = Astro.props;
-const blocks = text.trim() ? text.trim().split(/\n{2,}/) : [];
+const { text, kind } = Astro.props;
+const content = text.trim() || (kind ? LEGAL_DEFAULTS[kind] : '');
+const blocks = content ? content.split(/\n{2,}/) : [];
 ---
 
 <div class="prose">

@@ -1,4 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
+import { applySecurityHeaders } from './lib/security-headers';
 
 const API = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
 const PUBLIC_ADMIN_PATHS = new Set(['/admin/login', '/admin/sesion']);
@@ -11,7 +12,7 @@ interface MeResponse {
  * Protege /admin en el servidor: valida la sesión contra la API antes de renderizar.
  * (No basta con ocultar enlaces en el cliente.)
  */
-export const onRequest = defineMiddleware(async (context, next) => {
+const guard = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
   if (!pathname.startsWith('/admin') || PUBLIC_ADMIN_PATHS.has(pathname)) return next();
 
@@ -47,3 +48,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   response.headers.set('Cache-Control', 'no-store');
   return response;
 });
+
+export const onRequest = defineMiddleware(async (context, next) =>
+  applySecurityHeaders((await guard(context, next)) as Response, API, import.meta.env.PROD),
+);

@@ -267,3 +267,19 @@ describe('ajustes y administradores', () => {
     ).toBe(403);
   });
 });
+
+describe('dashboard', () => {
+  it('exige rol admin y devuelve el resumen', async () => {
+    expect((await t.request('/admin/dashboard')).status).toBe(401);
+    const res = await t.request('/admin/dashboard', { cookies: admin });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      sales: { total: number };
+      orders: { needsReview: number };
+      recentAudit: unknown[];
+    };
+    expect(body.sales.total).toBe(0);
+    expect(body.orders.needsReview).toBe(0);
+    expect(Array.isArray(body.recentAudit)).toBe(true);
+  });
+});
