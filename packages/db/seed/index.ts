@@ -105,15 +105,13 @@ async function main() {
       .returning();
     if (edition) {
       const start = Date.now() + 30 * 864e5;
-      await db
-        .insert(s.editionSessions)
-        .values(
-          [0, 7, 14, 21].map((d) => ({
-            editionId: edition.id,
-            startsAt: new Date(start + d * 864e5),
-            endsAt: new Date(start + d * 864e5 + 3 * 36e5),
-          })),
-        );
+      await db.insert(s.editionSessions).values(
+        [0, 7, 14, 21].map((d) => ({
+          editionId: edition.id,
+          startsAt: new Date(start + d * 864e5),
+          endsAt: new Date(start + d * 864e5 + 3 * 36e5),
+        })),
+      );
     }
   }
 

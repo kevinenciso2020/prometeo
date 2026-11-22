@@ -1,0 +1,111 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ImageUploader from '../../../components/ImageUploader.astro';
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Producto" active="productos">
+  <div class="page-head">
+    <h1 id="title">Producto</h1>
+    <div class="actions"><a class="btn" href="/admin/productos">Volver</a><button class="btn btn--danger" id="delete" type="button" hidden>Eliminar</button></div>
+  </div>
+  <form id="form" class="stack" data-id={id} novalidate>
+    <div class="card stack">
+      <div class="grid-2">
+        <div class="field"><label for="name">Nombre</label><input class="input" id="name" name="name" required /></div>
+        <div class="field"><label for="slug">Slug (URL)</label><input class="input" id="slug" name="slug" required /></div>
+      </div>
+      <div class="field"><label for="description">Descripción</label><textarea class="textarea" id="description" name="description"></textarea></div>
+      <div class="grid-2">
+        <div class="field"><label for="categoryId">Categoría</label><select class="select" id="categoryId" name="categoryId"><option value="">Sin categoría</option></select></div>
+        <div class="field"><label for="status">Estado</label>
+          <select class="select" id="status" name="status"><option value="borrador">Borrador</option><option value="publicado">Publicado</option><option value="archivado">Archivado</option></select></div>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Precio e inventario</h2>
+      <div class="grid-2">
+        <div class="field"><label for="price">Precio (COP)</label><input class="input" id="price" name="price" type="number" min="0" step="1" required /></div>
+        <div class="field"><label for="compareAtPrice">Precio comparativo (COP)</label><input class="input" id="compareAtPrice" name="compareAtPrice" type="number" min="0" step="1" /><span class="hint">Opcional. Debe ser mayor o igual al precio.</span></div>
+        <div class="field"><label for="stock">Stock</label><input class="input" id="stock" name="stock" type="number" min="0" step="1" value="0" /></div>
+        <div class="field"><label for="sku">SKU</label><input class="input" id="sku" name="sku" /></div>
+      </div>
+      <div class="grid-2">
+        <label class="check"><input type="checkbox" name="isUnique" /> Pieza única (stock máximo 1)</label>
+        <label class="check"><input type="checkbox" name="isFeatured" /> Destacado en el inicio</label>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Medidas y materiales</h2>
+      <div class="grid-2">
+        <div class="field"><label for="widthMm">Ancho (mm)</label><input class="input" id="widthMm" name="widthMm" type="number" min="0" /></div>
+        <div class="field"><label for="heightMm">Alto (mm)</label><input class="input" id="heightMm" name="heightMm" type="number" min="0" /></div>
+        <div class="field"><label for="depthMm">Fondo (mm)</label><input class="input" id="depthMm" name="depthMm" type="number" min="0" /></div>
+        <div class="field"><label for="weightGrams">Peso (g)</label><input class="input" id="weightGrams" name="weightGrams" type="number" min="0" /></div>
+      </div>
+      <div class="field"><label for="materials">Materiales</label><input class="input" id="materials" name="materials" /></div>
+    </div>
+    <div class="card"><ImageUploader folder="prometeo/products" label="Galería (la primera es la principal, o marca ★)" /></div>
+    <p class="form-error" id="error" role="alert"></p>
+    <div><button class="btn btn--primary" type="submit">Guardar producto</button></div>
+  </form>
+
+  <script>
+    import { slugify } from '@prometeo/shared';
+    import { $, api, errorMessage, fillForm, readForm, toast } from '../../../lib/admin-client';
+    type Img = { url: string; publicId: string; alt: string | null; isPrimary: boolean };
+    type Uploader = HTMLElement & { getImages(): Img[]; setImages(i: Img[]): void; markSaved(): void };
+
+    const form = $<HTMLFormElement>('#form');
+    const uploader = $<Uploader>('image-uploader');
+    const error = $('#error');
+    let id = form.dataset.id && form.dataset.id !== 'nuevo' ? form.dataset.id : null;
+
+    async function init() {
+      const cats = await api<{ items: { id: string; name: string }[] }>('/admin/categories');
+      const sel = $<HTMLSelectElement>('#categoryId');
+      for (const c of cats.items) sel.append(new Option(c.name, c.id));
+      if (!id) { $('#title').textContent = 'Nuevo producto'; return; }
+      const { item } = await api<{ item: Record<string, unknown> & { images: Img[] } }>(`/admin/products/${id}`);
+      $('#title').textContent = String(item.name);
+      fillForm(form, item);
+      uploader.setImages(item.images);
+      $<HTMLButtonElement>('#delete').hidden = false;
+    }
+
+    $<HTMLInputElement>('#name').addEventListener('input', (e) => {
+      const slug = $<HTMLInputElement>('#slug');
+      if (!id && !slug.dataset.touched) slug.value = slugify((e.target as HTMLInputElement).value);
+    });
+    $<HTMLInputElement>('#slug').addEventListener('input', (e) => ((e.target as HTMLElement).dataset.touched = '1'));
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      const v = readForm(form);
+      const body = { ...v, price: v.price ?? 0, stock: v.stock ?? 0, images: uploader.getImages() };
+      try {
+        const r = id
+          ? await api<{ item: { id: string } }>(`/admin/products/${id}`, 'PUT', body)
+          : await api<{ item: { id: string } }>('/admin/products', 'POST', body);
+        uploader.markSaved();
+        toast('Producto guardado');
+        if (!id) location.href = `/admin/productos/${r.item.id}`;
+      } catch (err) {
+        error.textContent = errorMessage(err);
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }
+    });
+
+    $('#delete').addEventListener('click', async () => {
+      if (!id || !confirm('¿Eliminar este producto y sus imágenes? No se puede deshacer.')) return;
+      try {
+        await api(`/admin/products/${id}`, 'DELETE');
+        location.href = '/admin/productos';
+      } catch (err) {
+        toast(errorMessage(err), 'error');
+      }
+    });
+    void init();
+  </script>
+</AdminLayout>

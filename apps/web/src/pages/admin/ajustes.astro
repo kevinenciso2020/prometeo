@@ -1,0 +1,82 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Ajustes" active="ajustes">
+  <div class="page-head"><h1>Ajustes del sitio</h1></div>
+  <form id="form" class="stack" novalidate>
+    <div class="card stack">
+      <h2>Envío</h2>
+      <div class="grid-2">
+        <div class="field"><label for="rate">Tarifa fija nacional (COP)</label><input class="input" id="rate" name="shipping_flat_rate" type="number" min="0" step="1" required /></div>
+        <div class="field"><label for="threshold">Envío gratis desde (COP)</label><input class="input" id="threshold" name="free_shipping_threshold" type="number" min="0" step="1" /><span class="hint">Déjalo vacío para no ofrecer envío gratis.</span></div>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Contacto</h2>
+      <div class="grid-2">
+        <div class="field"><label for="c-email">Correo</label><input class="input" id="c-email" name="contact.email" type="email" /></div>
+        <div class="field"><label for="c-phone">Teléfono</label><input class="input" id="c-phone" name="contact.phone" /></div>
+        <div class="field"><label for="c-wa">WhatsApp</label><input class="input" id="c-wa" name="contact.whatsapp" /></div>
+        <div class="field"><label for="c-addr">Dirección</label><input class="input" id="c-addr" name="contact.address" /></div>
+        <div class="field"><label for="c-hours">Horario</label><input class="input" id="c-hours" name="contact.hours" /></div>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Redes sociales</h2>
+      <div class="grid-2">
+        <div class="field"><label for="s-ig">Instagram (URL)</label><input class="input" id="s-ig" name="social.instagram" type="url" /></div>
+        <div class="field"><label for="s-fb">Facebook (URL)</label><input class="input" id="s-fb" name="social.facebook" type="url" /></div>
+        <div class="field"><label for="s-tt">TikTok (URL)</label><input class="input" id="s-tt" name="social.tiktok" type="url" /></div>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Textos legales</h2>
+      <div class="field"><label for="l-terms">Términos y condiciones</label><textarea class="textarea" id="l-terms" name="legal.terms"></textarea></div>
+      <div class="field"><label for="l-priv">Política de privacidad (Ley 1581 de 2012)</label><textarea class="textarea" id="l-priv" name="legal.privacy"></textarea></div>
+      <div class="field"><label for="l-ship">Envíos y devoluciones (Ley 1480 de 2011)</label><textarea class="textarea" id="l-ship" name="legal.shipping_returns"></textarea></div>
+    </div>
+    <p class="form-error" id="error" role="alert"></p>
+    <div><button class="btn btn--primary" type="submit">Guardar ajustes</button></div>
+  </form>
+
+  <script>
+    import { $, api, errorMessage, toast } from '../../lib/admin-client';
+    const form = $<HTMLFormElement>('#form');
+    const error = $('#error');
+    type Settings = Record<string, unknown>;
+
+    const fields = () => Array.from(form.elements).filter((e): e is HTMLInputElement | HTMLTextAreaElement => (e instanceof HTMLInputElement || e instanceof HTMLTextAreaElement) && !!e.name);
+
+    function fill(s: Settings) {
+      for (const el of fields()) {
+        const [a, b] = el.name.split('.');
+        const v = b ? (s[a as string] as Record<string, unknown> | undefined)?.[b] : s[a as string];
+        el.value = v === null || v === undefined ? '' : String(v);
+      }
+    }
+    function collect(): Settings {
+      const out: Record<string, unknown> = {};
+      for (const el of fields()) {
+        const [a, b] = el.name.split('.') as [string, string | undefined];
+        if (b) (out[a] ??= {} as Record<string, string>), ((out[a] as Record<string, string>)[b] = el.value.trim());
+        else out[a] = el.value === '' ? null : Number(el.value);
+      }
+      if (out.shipping_flat_rate === null) out.shipping_flat_rate = 0;
+      return out;
+    }
+
+    void api<{ settings: Settings }>('/admin/settings').then((r) => fill(r.settings)).catch((e) => toast(errorMessage(e), 'error'));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      try {
+        const r = await api<{ settings: Settings }>('/admin/settings', 'PUT', collect());
+        fill(r.settings);
+        toast('Ajustes guardados');
+      } catch (err) {
+        error.textContent = errorMessage(err);
+      }
+    });
+  </script>
+</AdminLayout>

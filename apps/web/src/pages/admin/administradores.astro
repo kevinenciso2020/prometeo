@@ -1,0 +1,81 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+const me = Astro.locals.user?.id ?? '';
+---
+
+<AdminLayout title="Administradores" active="administradores">
+  <div class="page-head">
+    <h1>Administradores</h1>
+    <button class="btn btn--primary" id="new" type="button">Nuevo administrador</button>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="rows" data-me={me}></tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin-top: var(--space-4); color: var(--color-ink-mute)">
+    Solo un SUPER_ADMIN puede asignar roles y nunca a sí mismo. Cada cambio queda en el registro de auditoría.
+  </p>
+
+  <dialog id="dlg" aria-labelledby="dlg-title">
+    <form id="form" class="stack" novalidate>
+      <h2 id="dlg-title">Nuevo administrador</h2>
+      <div class="field"><label for="name">Nombre</label><input class="input" id="name" name="name" required /></div>
+      <div class="field"><label for="email">Correo</label><input class="input" id="email" name="email" type="email" required /></div>
+      <div class="field"><label for="password">Contraseña inicial</label><input class="input" id="password" name="password" type="password" minlength="10" autocomplete="new-password" required /><span class="hint">Mínimo 10 caracteres. Compártela por un canal seguro.</span></div>
+      <p class="form-error" id="error" role="alert"></p>
+      <div class="actions"><button class="btn" type="button" id="cancel">Cancelar</button><button class="btn btn--primary" type="submit">Crear</button></div>
+    </form>
+  </dialog>
+
+  <script>
+    import { $, api, errorMessage, esc, readForm, toast } from '../../lib/admin-client';
+    interface U { id: string; name: string; email: string; role: 'ADMIN' | 'SUPER_ADMIN' | 'CLIENTE'; isActive: boolean }
+    const me = $('#rows').dataset.me;
+    const dlg = $<HTMLDialogElement>('#dlg');
+    const form = $<HTMLFormElement>('#form');
+
+    async function load() {
+      const { items } = await api<{ items: U[] }>('/admin/users');
+      $('#rows').innerHTML = items.map((u) => {
+        const self = u.id === me;
+        return `<tr><td>${esc(u.name)}${self ? ' <span class="badge">Tú</span>' : ''}</td><td>${esc(u.email)}</td>
+          <td><span class="badge badge--solid">${u.role}</span></td>
+          <td><span class="badge ${u.isActive ? '' : 'badge--mute'}">${u.isActive ? 'Activo' : 'Desactivado'}</span></td>
+          <td class="actions">${self ? '' : `
+            <button class="btn btn--sm" data-role="${u.id}" data-to="${u.role === 'ADMIN' ? 'SUPER_ADMIN' : 'ADMIN'}">Hacer ${u.role === 'ADMIN' ? 'SUPER_ADMIN' : 'ADMIN'}</button>
+            <button class="btn btn--sm" data-demote="${u.id}">Quitar acceso</button>
+            <button class="btn btn--sm ${u.isActive ? 'btn--danger' : ''}" data-active="${u.id}" data-to="${!u.isActive}">${u.isActive ? 'Desactivar' : 'Activar'}</button>`}</td></tr>`;
+      }).join('');
+    }
+
+    $('#rows').addEventListener('click', async (e) => {
+      const d = (e.target as HTMLElement).dataset;
+      try {
+        if (d.role && confirm(`¿Cambiar el rol a ${d.to}?`)) await api(`/admin/users/${d.role}/role`, 'PATCH', { role: d.to });
+        else if (d.demote && confirm('¿Quitar el acceso de administrador (pasa a CLIENTE)?')) await api(`/admin/users/${d.demote}/role`, 'PATCH', { role: 'CLIENTE' });
+        else if (d.active) await api(`/admin/users/${d.active}/active`, 'PATCH', { isActive: d.to === 'true' });
+        else return;
+        toast('Cambio aplicado');
+        await load();
+      } catch (err) {
+        toast(errorMessage(err), 'error');
+      }
+    });
+    $('#new').addEventListener('click', () => { form.reset(); $('#error').textContent = ''; dlg.showModal(); });
+    $('#cancel').addEventListener('click', () => dlg.close());
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api('/admin/users', 'POST', readForm(form));
+        dlg.close();
+        toast('Administrador creado');
+        await load();
+      } catch (err) {
+        $('#error').textContent = errorMessage(err);
+      }
+    });
+    void load().catch((e) => toast(errorMessage(e), 'error'));
+  </script>
+</AdminLayout>

@@ -1,0 +1,23 @@
+---
+import '../../styles/global.css';
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Verificando sesión…</title>
+  </head>
+  <body>
+    <p style="padding: 2rem; font-family: system-ui">Verificando sesión…</p>
+    <script>
+      import { refreshSession } from '../../lib/admin-client';
+      const next = new URLSearchParams(location.search).get('next') ?? '/admin';
+      const safe = next.startsWith('/admin') && !next.startsWith('/admin/sesion') ? next : '/admin';
+      void refreshSession().then((ok) => {
+        location.replace(ok ? safe : `/admin/login?next=${encodeURIComponent(safe)}`);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,113 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import ImageUploader from '../../components/ImageUploader.astro';
+---
+
+<AdminLayout title="Categorías" active="categorias">
+  <div class="page-head">
+    <h1>Categorías</h1>
+    <button class="btn btn--primary" id="new" type="button">Nueva categoría</button>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Nombre</th><th>Slug</th><th class="num">Orden</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <dialog id="dlg" aria-labelledby="dlg-title">
+    <form id="form" class="stack" novalidate>
+      <h2 id="dlg-title">Categoría</h2>
+      <div class="field"><label for="name">Nombre</label><input class="input" id="name" name="name" required /></div>
+      <div class="field"><label for="slug">Slug (URL)</label><input class="input" id="slug" name="slug" required /></div>
+      <div class="field"><label for="description">Descripción</label><textarea class="textarea" id="description" name="description"></textarea></div>
+      <div class="grid-2">
+        <div class="field"><label for="sortOrder">Orden</label><input class="input" id="sortOrder" name="sortOrder" type="number" min="0" value="0" /></div>
+        <label class="check"><input type="checkbox" name="isActive" checked /> Activa</label>
+      </div>
+      <ImageUploader folder="prometeo/categories" label="Imagen" max={1} />
+      <p class="form-error" id="error" role="alert"></p>
+      <div class="actions">
+        <button class="btn" type="button" id="cancel">Cancelar</button>
+        <button class="btn btn--primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    import { slugify } from '@prometeo/shared';
+    import { $, api, errorMessage, esc, fillForm, readForm, toast } from '../../lib/admin-client';
+
+    interface Cat { id: string; name: string; slug: string; description: string | null; imageUrl: string | null; imagePublicId: string | null; sortOrder: number; isActive: boolean }
+    type Uploader = HTMLElement & { getImages(): { url: string; publicId: string; alt: string | null; isPrimary: boolean }[]; setImages(i: unknown[]): void; markSaved(): void };
+
+    const dlg = $<HTMLDialogElement>('#dlg');
+    const form = $<HTMLFormElement>('#form');
+    const uploader = $<Uploader>('image-uploader');
+    const error = $('#error');
+    let items: Cat[] = [];
+    let editing: string | null = null;
+
+    async function load() {
+      items = (await api<{ items: Cat[] }>('/admin/categories')).items;
+      $('#rows').innerHTML = items.length
+        ? items.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(c.slug)}</td><td class="num">${c.sortOrder}</td>
+            <td><span class="badge ${c.isActive ? 'badge--solid' : 'badge--mute'}">${c.isActive ? 'Activa' : 'Oculta'}</span></td>
+            <td class="actions"><button class="btn btn--sm" data-edit="${c.id}">Editar</button><button class="btn btn--sm btn--danger" data-del="${c.id}">Eliminar</button></td></tr>`).join('')
+        : '<tr><td colspan="5" class="empty">Aún no hay categorías</td></tr>';
+    }
+
+    function open(c?: Cat) {
+      editing = c?.id ?? null;
+      form.reset();
+      error.textContent = '';
+      fillForm(form, c ? { ...c } : { sortOrder: 0, isActive: true });
+      uploader.setImages(c?.imageUrl && c.imagePublicId ? [{ url: c.imageUrl, publicId: c.imagePublicId, alt: null, isPrimary: true }] : []);
+      dlg.showModal();
+    }
+
+    $('#new').addEventListener('click', () => open());
+    $('#cancel').addEventListener('click', () => dlg.close());
+    $<HTMLInputElement>('#name').addEventListener('input', (e) => {
+      const slug = $<HTMLInputElement>('#slug');
+      if (!editing && !slug.dataset.touched) slug.value = slugify((e.target as HTMLInputElement).value);
+    });
+    $<HTMLInputElement>('#slug').addEventListener('input', (e) => ((e.target as HTMLElement).dataset.touched = '1'));
+
+    $('#rows').addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const edit = t.dataset.edit;
+      const del = t.dataset.del;
+      if (edit) open(items.find((c) => c.id === edit));
+      if (del && confirm('¿Eliminar esta categoría? Los productos quedarán sin categoría.')) {
+        try {
+          await api(`/admin/categories/${del}`, 'DELETE');
+          toast('Categoría eliminada');
+          await load();
+        } catch (err) {
+          toast(errorMessage(err), 'error');
+        }
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      const v = readForm(form);
+      const img = uploader.getImages()[0];
+      const body = { ...v, name: v.name ?? '', imageUrl: img?.url ?? null, imagePublicId: img?.publicId ?? null, sortOrder: v.sortOrder ?? 0 };
+      try {
+        if (editing) await api(`/admin/categories/${editing}`, 'PUT', body);
+        else await api('/admin/categories', 'POST', body);
+        uploader.markSaved();
+        dlg.close();
+        toast('Categoría guardada');
+        await load();
+      } catch (err) {
+        error.textContent = errorMessage(err);
+      }
+    });
+
+    void load();
+  </script>
+</AdminLayout>

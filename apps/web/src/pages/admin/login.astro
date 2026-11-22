@@ -1,0 +1,83 @@
+---
+import '../../styles/global.css';
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Ingresar · Admin Prometeo</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main class="login">
+      <form class="card" id="form" novalidate>
+        <h1>Prometeo</h1>
+        <p class="sub">Panel de administración</p>
+        <div class="field">
+          <label for="email">Correo electrónico</label>
+          <input class="input" id="email" name="email" type="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <input class="input" id="password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <p class="form-error" id="error" role="alert"></p>
+        <button class="btn btn--primary" type="submit">Ingresar</button>
+      </form>
+    </main>
+    <style>
+      .login {
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: var(--space-4);
+        background: var(--color-surface);
+      }
+      .card {
+        width: min(24rem, 100%);
+        display: grid;
+        gap: var(--space-4);
+        padding: var(--space-6);
+        background: var(--color-bg);
+        border: var(--border-w) solid var(--color-line);
+        box-shadow: var(--shadow-hard);
+      }
+      h1 {
+        font-size: var(--text-2xl);
+      }
+      .sub {
+        color: var(--color-ink-mute);
+        margin-top: calc(var(--space-3) * -1);
+      }
+      .form-error {
+        color: var(--color-danger);
+        font-size: var(--text-sm);
+        font-weight: 600;
+        min-height: 1.2em;
+      }
+    </style>
+    <script>
+      import { api, errorMessage } from '../../lib/admin-client';
+      const form = document.getElementById('form') as HTMLFormElement;
+      const error = document.getElementById('error') as HTMLElement;
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        error.textContent = '';
+        const data = new FormData(form);
+        try {
+          await api('/auth/login', 'POST', { email: String(data.get('email')), password: String(data.get('password')) });
+          const next = new URLSearchParams(location.search).get('next') ?? '/admin';
+          location.href = next.startsWith('/admin') ? next : '/admin';
+        } catch (err) {
+          error.textContent = errorMessage(err);
+        }
+      });
+    </script>
+  </body>
+</html>

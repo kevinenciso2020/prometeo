@@ -1,0 +1,269 @@
+---
+interface Props {
+  folder: string;
+  label?: string;
+  max?: number;
+}
+const { folder, label = 'Imágenes', max = 12 } = Astro.props;
+---
+
+<image-uploader data-folder={folder} data-max={max}>
+  <div class="field">
+    <span class="label">{label}</span>
+    <div class="drop" data-drop tabindex="0" role="button" aria-label="Soltar imágenes aquí o pulsar para elegir">
+      <p><strong>Arrastra imágenes aquí</strong> o pulsa para elegirlas</p>
+      <p class="hint">JPG, PNG, WEBP o AVIF · máx. 8 MB · hasta {max}</p>
+      <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple hidden data-file />
+    </div>
+    <ul class="list" role="list" data-list aria-label="Galería"></ul>
+    <div class="url-row">
+      <input class="input" type="url" placeholder="o pega una URL de res.cloudinary.com/..." data-url aria-label="URL de Cloudinary" />
+      <button class="btn btn--sm" type="button" data-add-url>Agregar URL</button>
+    </div>
+    <p class="form-error" data-error role="alert"></p>
+  </div>
+</image-uploader>
+
+<style is:global>
+  image-uploader .drop {
+    border: var(--border-w) dashed var(--color-line);
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    cursor: pointer;
+    background: var(--color-surface);
+    transition: background var(--dur) var(--ease);
+  }
+  image-uploader .drop.is-over,
+  image-uploader .drop:hover {
+    background: var(--color-surface-2);
+  }
+  image-uploader .list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+  image-uploader .item {
+    border: var(--border-w) solid var(--color-line);
+    background: var(--color-bg);
+    display: grid;
+  }
+  image-uploader .item[draggable='true'] {
+    cursor: grab;
+  }
+  image-uploader .item.is-dragging {
+    opacity: 0.4;
+  }
+  image-uploader .item img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+  image-uploader .item.is-uploading {
+    padding: var(--space-5) var(--space-2);
+    text-align: center;
+    font-size: var(--text-xs);
+  }
+  image-uploader .item-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: var(--space-1);
+    border-top: 1px solid var(--color-line);
+  }
+  image-uploader .item-bar button {
+    flex: 1;
+    min-height: 1.75rem;
+    min-width: 1.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-bg);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  image-uploader .item-bar button[aria-pressed='true'] {
+    background: var(--color-ink);
+    color: var(--color-inverse-ink);
+  }
+  image-uploader .url-row {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+</style>
+
+<script>
+  import { UPLOAD_FOLDERS, parseCloudinaryUrl, type UploadFolder } from '@prometeo/shared';
+  import { CLOUD_NAME, api, errorMessage, esc, thumb, uploadImage } from '../lib/admin-client';
+
+  export interface GalleryImage {
+    url: string;
+    publicId: string;
+    alt: string | null;
+    isPrimary: boolean;
+  }
+
+  class ImageUploader extends HTMLElement {
+    private images: GalleryImage[] = [];
+    /** public_id subidos en esta sesión que aún no se guardaron (se borran si se quitan). */
+    private fresh = new Set<string>();
+    private pending = 0;
+    private dragFrom = -1;
+
+    connectedCallback(): void {
+      const drop = this.q('[data-drop]');
+      const file = this.q<HTMLInputElement>('[data-file]');
+      drop.addEventListener('click', () => file.click());
+      drop.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          file.click();
+        }
+      });
+      drop.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        drop.classList.add('is-over');
+      });
+      drop.addEventListener('dragleave', () => drop.classList.remove('is-over'));
+      drop.addEventListener('drop', (e) => {
+        e.preventDefault();
+        drop.classList.remove('is-over');
+        void this.upload(Array.from(e.dataTransfer?.files ?? []));
+      });
+      file.addEventListener('change', () => {
+        void this.upload(Array.from(file.files ?? []));
+        file.value = '';
+      });
+      this.q('[data-add-url]').addEventListener('click', () => this.addUrl());
+      this.render();
+    }
+
+    private q<T extends HTMLElement = HTMLElement>(sel: string): T {
+      const el = this.querySelector<T>(sel);
+      if (!el) throw new Error(sel);
+      return el;
+    }
+
+    private get max(): number {
+      return Number(this.dataset.max ?? 12);
+    }
+
+    private error(msg: string): void {
+      this.q('[data-error]').textContent = msg;
+    }
+
+    getImages(): GalleryImage[] {
+      return this.images.map((i, idx) => ({ ...i, isPrimary: i.isPrimary || (idx === 0 && !this.images.some((x) => x.isPrimary)) }));
+    }
+
+    setImages(images: GalleryImage[]): void {
+      this.images = images.map((i) => ({ url: i.url, publicId: i.publicId, alt: i.alt ?? null, isPrimary: i.isPrimary }));
+      this.fresh.clear();
+      this.render();
+    }
+
+    /** Tras guardar con éxito, lo subido ya no es "temporal". */
+    markSaved(): void {
+      this.fresh.clear();
+    }
+
+    private async upload(files: File[]): Promise<void> {
+      this.error('');
+      const folder = this.dataset.folder as UploadFolder;
+      if (!(UPLOAD_FOLDERS as readonly string[]).includes(folder)) return this.error('Carpeta de subida inválida');
+      for (const f of files) {
+        if (this.images.length + this.pending >= this.max) {
+          this.error(`Máximo ${this.max} imágenes`);
+          break;
+        }
+        this.pending++;
+        this.render();
+        try {
+          const up = await uploadImage(f, folder);
+          this.images.push({ ...up, alt: null, isPrimary: this.images.length === 0 });
+          this.fresh.add(up.publicId);
+        } catch (err) {
+          this.error(`${f.name}: ${err instanceof Error ? err.message : errorMessage(err)}`);
+        } finally {
+          this.pending--;
+          this.render();
+        }
+      }
+    }
+
+    private addUrl(): void {
+      const input = this.q<HTMLInputElement>('[data-url]');
+      this.error('');
+      const parsed = parseCloudinaryUrl(input.value.trim(), CLOUD_NAME);
+      if (!parsed) return this.error(`La URL debe ser de https://res.cloudinary.com/${CLOUD_NAME || '<cloud>'}/...`);
+      if (this.images.some((i) => i.publicId === parsed.publicId)) return this.error('Esa imagen ya está en la galería');
+      if (this.images.length >= this.max) return this.error(`Máximo ${this.max} imágenes`);
+      this.images.push({ ...parsed, alt: null, isPrimary: this.images.length === 0 });
+      input.value = '';
+      this.render();
+    }
+
+    private move(from: number, to: number): void {
+      if (to < 0 || to >= this.images.length || from === to) return;
+      const [item] = this.images.splice(from, 1);
+      if (item) this.images.splice(to, 0, item);
+      this.render();
+    }
+
+    private async removeAt(idx: number): Promise<void> {
+      const [img] = this.images.splice(idx, 1);
+      if (!img) return;
+      if (img.isPrimary && this.images[0]) this.images[0].isPrimary = true;
+      // Subida no guardada: se borra de inmediato en Cloudinary. Las guardadas se borran al guardar.
+      if (this.fresh.delete(img.publicId)) {
+        await api('/admin/uploads/destroy', 'POST', { publicId: img.publicId }).catch(() => undefined);
+      }
+      this.render();
+    }
+
+    private render(): void {
+      const list = this.q('[data-list]');
+      const items = this.images.map((img, i) => {
+        const li = document.createElement('li');
+        li.className = 'item';
+        li.draggable = true;
+        li.innerHTML = `<img src="${esc(thumb(img.url))}" alt="${esc(img.alt ?? '')}" loading="lazy" />
+          <div class="item-bar">
+            <button type="button" data-act="primary" aria-pressed="${img.isPrimary}" title="Imagen principal">★</button>
+            <button type="button" data-act="left" aria-label="Mover antes">←</button>
+            <button type="button" data-act="right" aria-label="Mover después">→</button>
+            <button type="button" data-act="del" aria-label="Eliminar imagen">✕</button>
+          </div>`;
+        li.addEventListener('dragstart', () => {
+          this.dragFrom = i;
+          li.classList.add('is-dragging');
+        });
+        li.addEventListener('dragend', () => li.classList.remove('is-dragging'));
+        li.addEventListener('dragover', (e) => e.preventDefault());
+        li.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.move(this.dragFrom, i);
+        });
+        li.querySelector('[data-act="primary"]')?.addEventListener('click', () => {
+          this.images.forEach((x, k) => (x.isPrimary = k === i));
+          this.render();
+        });
+        li.querySelector('[data-act="left"]')?.addEventListener('click', () => this.move(i, i - 1));
+        li.querySelector('[data-act="right"]')?.addEventListener('click', () => this.move(i, i + 1));
+        li.querySelector('[data-act="del"]')?.addEventListener('click', () => void this.removeAt(i));
+        return li;
+      });
+      for (let k = 0; k < this.pending; k++) {
+        const li = document.createElement('li');
+        li.className = 'item is-uploading';
+        li.textContent = 'Subiendo…';
+        items.push(li);
+      }
+      list.replaceChildren(...items);
+    }
+  }
+
+  if (!customElements.get('image-uploader')) customElements.define('image-uploader', ImageUploader);
+</script>

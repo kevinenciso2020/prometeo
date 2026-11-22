@@ -1,0 +1,27 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Panel" active="panel">
+  <div class="page-head">
+    <h1>Panel</h1>
+  </div>
+  <div class="stats">
+    <div class="card stat"><span>Productos</span><strong id="n-products">–</strong></div>
+    <div class="card stat"><span>Categorías</span><strong id="n-categories">–</strong></div>
+    <div class="card stat"><span>Servicios</span><strong id="n-services">–</strong></div>
+  </div>
+  <p class="hint" style="margin-top: var(--space-6); color: var(--color-ink-mute)">
+    Ventas, pedidos, ediciones e inscripciones se sumarán al panel en las próximas fases.
+  </p>
+  <script>
+    import { api } from '../../lib/admin-client';
+    const set = (id: string, n: number) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(n);
+    };
+    void api<{ total: number }>('/admin/products?pageSize=1').then((r) => set('n-products', r.total));
+    void api<{ total: number }>('/admin/services?pageSize=1').then((r) => set('n-services', r.total));
+    void api<{ items: unknown[] }>('/admin/categories').then((r) => set('n-categories', r.items.length));
+  </script>
+</AdminLayout>

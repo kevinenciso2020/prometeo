@@ -12,6 +12,8 @@ WEB_URL = "http://localhost:4321"
 EMAIL_FROM = "Prometeo <no-reply@prometeo.local>"
 # En producción: ".<dominio>" para compartir cookies con el front. En local déjalo vacío.
 COOKIE_DOMAIN = ""
+# Nombre de tu cuenta en Cloudinary (Dashboard > Settings). No es secreto.
+CLOUDINARY_CLOUD_NAME = "tu-cloud-name"
 
 # Cron Triggers (los handlers se implementan en la Fase 4)
 [triggers]
@@ -23,4 +25,4 @@ name = "RL_AUTH"
 namespace_id = "1001"
 simple = { limit = 10, period = 60 }
 
-# Secretos (NO van aquí): wrangler secret put DATABASE_URL | JWT_SECRET | RESEND_API_KEY
+# Secretos (NO van aquí): wrangler secret put DATABASE_URL | JWT_SECRET | RESEND_API_KEY | CLOUDINARY_API_KEY | CLOUDINARY_API_SECRET

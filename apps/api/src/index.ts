@@ -6,6 +6,7 @@ import { mailerFromEnv, type Mailer } from './lib/mailer';
 import { onError, onNotFound } from './middleware/errors';
 import { corsPolicy, originCheck, securityHeaders } from './middleware/security';
 import { adminRoutes } from './routes/admin';
+import { createCloudinary, type CloudinaryClient } from './lib/cloudinary';
 import { authRoutes } from './routes/auth';
 import { health } from './routes/health';
 
@@ -13,6 +14,7 @@ export interface AppDeps {
   /** Inyectables para tests. Por defecto: Neon (HTTP) y Resend/consola. */
   getDb?: (env: Bindings) => Db;
   getMailer?: (env: Bindings) => Mailer;
+  getCloudinary?: (env: Bindings) => CloudinaryClient;
 }
 
 export function createApp(deps: AppDeps = {}) {
@@ -24,6 +26,18 @@ export function createApp(deps: AppDeps = {}) {
   app.use('*', async (c, next) => {
     c.set('db', (deps.getDb ?? ((env) => createHttpDb(env.DATABASE_URL)))(c.env));
     c.set('mailer', (deps.getMailer ?? mailerFromEnv)(c.env));
+    c.set(
+      'cloudinary',
+      (
+        deps.getCloudinary ??
+        ((env) =>
+          createCloudinary({
+            cloudName: env.CLOUDINARY_CLOUD_NAME,
+            apiKey: env.CLOUDINARY_API_KEY,
+            apiSecret: env.CLOUDINARY_API_SECRET,
+          }))
+      )(c.env),
+    );
     await next();
   });
 

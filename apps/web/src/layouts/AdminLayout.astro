@@ -1,0 +1,67 @@
+---
+import '../styles/global.css';
+import '../styles/admin.css';
+
+interface Props {
+  title: string;
+  active?: string;
+}
+const { title, active = '' } = Astro.props;
+const user = Astro.locals.user;
+const links = [
+  { href: '/admin', key: 'panel', label: 'Panel' },
+  { href: '/admin/productos', key: 'productos', label: 'Productos' },
+  { href: '/admin/categorias', key: 'categorias', label: 'Categorías' },
+  { href: '/admin/servicios', key: 'servicios', label: 'Servicios' },
+  { href: '/admin/ajustes', key: 'ajustes', label: 'Ajustes' },
+  ...(user?.role === 'SUPER_ADMIN' ? [{ href: '/admin/administradores', key: 'administradores', label: 'Administradores' }] : []),
+];
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} · Admin Prometeo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <div class="admin">
+      <nav class="admin__nav" aria-label="Panel de administración">
+        <a class="admin__brand" href="/admin">Prometeo</a>
+        <ul class="admin__links">
+          {links.map((l) => (
+            <li>
+              <a href={l.href} aria-current={active === l.key ? 'page' : undefined}>{l.label}</a>
+            </li>
+          ))}
+        </ul>
+        <div class="admin__user">
+          <span>{user?.name}<br />{user?.role}</span>
+          <button class="btn btn--sm" id="logout" type="button">Cerrar sesión</button>
+        </div>
+      </nav>
+      <main class="admin__main" id="contenido">
+        <slot />
+      </main>
+    </div>
+    <script>
+      import { api } from '../lib/admin-client';
+      document.getElementById('logout')?.addEventListener('click', async () => {
+        try {
+          await api('/auth/logout', 'POST', {});
+        } finally {
+          location.href = '/admin/login';
+        }
+      });
+    </script>
+  </body>
+</html>

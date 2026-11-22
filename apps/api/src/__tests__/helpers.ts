@@ -6,6 +6,7 @@ import { schema, users, type Db } from '@prometeo/db';
 import { hashPassword, type Role } from '@prometeo/shared';
 import { createApp } from '../index';
 import type { Bindings } from '../env';
+import { createCloudinary, type CloudinaryClient } from '../lib/cloudinary';
 import type { Email, Mailer } from '../lib/mailer';
 
 export const ORIGIN = 'http://localhost:4321';
@@ -17,6 +18,9 @@ export const env: Bindings = {
   WEB_ORIGIN: ORIGIN,
   WEB_URL: ORIGIN,
   EMAIL_FROM: 'Prometeo <test@prometeo.local>',
+  CLOUDINARY_CLOUD_NAME: 'democloud',
+  CLOUDINARY_API_KEY: '111222333',
+  CLOUDINARY_API_SECRET: 'secreto-cloudinary',
 };
 
 const migrationsFolder = fileURLToPath(
@@ -29,7 +33,24 @@ export async function createTestContext() {
   await migrate(drizzle(client, { schema }), { migrationsFolder });
   const outbox: Email[] = [];
   const mailer: Mailer = { send: async (e) => void outbox.push(e) };
-  const app = createApp({ getDb: () => db, getMailer: () => mailer });
+  const destroyed: string[] = [];
+  const real = createCloudinary({
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    apiSecret: env.CLOUDINARY_API_SECRET,
+  });
+  const cloudinary: CloudinaryClient = {
+    signUpload: real.signUpload,
+    destroy: async (id) => {
+      destroyed.push(id);
+      return true;
+    },
+  };
+  const app = createApp({
+    getDb: () => db,
+    getMailer: () => mailer,
+    getCloudinary: () => cloudinary,
+  });
 
   let ipCounter = 0;
   const request = (path: string, init: RequestInit & { cookies?: string } = {}) => {
@@ -44,7 +65,11 @@ export async function createTestContext() {
   const post = (path: string, body: unknown, cookies?: string) =>
     request(path, { method: 'POST', body: JSON.stringify(body), cookies });
 
-  return { db, app, outbox, request, post };
+  const put = (path: string, body: unknown, cookies?: string) =>
+    request(path, { method: 'PUT', body: JSON.stringify(body), cookies });
+  const login = async (email: string, password = 'clave-segura-123') =>
+    cookieHeader(await post('/auth/login', { email, password }));
+  return { db, app, outbox, request, post, put, login, destroyed };
 }
 
 export function setCookies(res: Response): string[] {
