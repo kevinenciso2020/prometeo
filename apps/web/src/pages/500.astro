@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+Astro.response.status = 500;
+---
+
+<BaseLayout title="Algo salió mal" noindex cacheable={false}>
+  <div class="container section">
+    <p class="eyebrow">Error 500</p>
+    <h1>Tuvimos un problema</h1>
+    <p>Algo falló de nuestro lado. Intenta de nuevo en unos minutos; si persiste, escríbenos desde la página de contacto.</p>
+    <p class="actions"><a class="btn btn--primary" href="/">Volver al inicio</a><a class="btn" href="/contacto">Contacto</a></p>
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    font-size: var(--text-3xl);
+    margin-block: var(--space-2) var(--space-4);
+  }
+  .actions {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+    flex-wrap: wrap;
+  }
+</style>

@@ -37,11 +37,8 @@ const popup = byPlacement(campaigns, 'popup')[0];
 const fullTitle = title ? `${title} · ${SITE_NAME}` : `${SITE_NAME} · ${SITE_TAGLINE}`;
 const canonical = `${SITE_URL}${Astro.url.pathname}`;
 const ld = structuredData ? (Array.isArray(structuredData) ? structuredData : [structuredData]) : [];
-if (cacheable) {
-  Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300');
-} else {
-  Astro.response.headers.set('Cache-Control', 'private, no-store');
-}
+// Cache-Control lo fija el middleware por ruta (src/lib/cache-control.ts): desde Astro 7 los
+// headers de Astro.response no se propagan desde un layout.
 ---
 
 <!doctype html>

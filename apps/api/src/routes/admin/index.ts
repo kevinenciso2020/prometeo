@@ -4,6 +4,7 @@ import { requireRole } from '../../middleware/auth';
 import { campaignsRoutes } from './campaigns';
 import { categoriesRoutes } from './categories';
 import { couponsRoutes } from './coupons';
+import { dashboardRoutes } from './dashboard';
 import { coursesRoutes } from './courses';
 import { editionsRoutes } from './editions';
 import { enrollmentsRoutes } from './enrollments';
@@ -22,6 +23,7 @@ adminRoutes.use('*', requireRole('ADMIN', 'SUPER_ADMIN'));
 
 adminRoutes.get('/ping', (c) => c.json({ ok: true, role: c.get('user')?.role }));
 
+adminRoutes.route('/dashboard', dashboardRoutes);
 adminRoutes.route('/uploads', uploadsRoutes);
 adminRoutes.route('/categories', categoriesRoutes);
 adminRoutes.route('/products', productsRoutes);
