@@ -18,6 +18,7 @@ const campaigns = await pageCampaigns(Astro.locals, Astro.url.pathname);
 const heroCampaign = byPlacement(campaigns, 'hero_banner')[0];
 const sectionBanners = byPlacement(campaigns, 'banner_seccion');
 const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
+const HERO_PHOTO = '/img/hero-torno.jpg';
 ---
 
 <BaseLayout
@@ -37,7 +38,10 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
           <a class="btn" href="/servicios">Servicios</a>
         </div>
       </div>
-      <Picture src={heroImage} alt="Pieza de cerámica de Prometeo" ratio="4 / 5" width={1024} sizes="(min-width: 60rem) 40vw, 90vw" eager class="hero__pic" />
+      <div class="hero__frame">
+        <Picture src={HERO_PHOTO} alt="Manos de alfarero dando forma al barro sobre el torno" ratio="4 / 5" width={1024} sizes="(min-width: 60rem) 40vw, 90vw" eager class="hero__pic" />
+        <p class="hero__seal" aria-hidden="true"><span>Hecho</span><span>a mano</span></p>
+      </div>
     </div>
   </section>
 
@@ -64,6 +68,16 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
     }
   </section>
 
+  <section class="kiln" aria-label="El taller">
+    <div class="container kiln__in">
+      <div class="kiln__text">
+        <h2>Cada pieza pasa por nuestras manos y por el horno.</h2>
+        <p>Hornadas pequeñas, esmaltes propios y barro de la región. Por eso no hay dos piezas iguales.</p>
+        <a class="btn" href="/el-taller">Conoce el taller</a>
+      </div>
+    </div>
+  </section>
+
   {
     services && services.items.length > 0 && (
       <section class="section container">
@@ -72,6 +86,7 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
           {services.items.slice(0, 3).map((s) => (
             <li>
               <a href={`/servicios/${s.slug}`}>
+                <Picture src={s.image} alt={s.name} ratio="4 / 3" sizes="(min-width: 60rem) 30vw, 90vw" />
                 <h3>{s.name}</h3>
                 <p>{s.description.slice(0, 120)}{s.description.length > 120 ? '…' : ''}</p>
                 <span class="link-arrow">Conocer más →</span>
@@ -91,6 +106,7 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
           {upcoming.map((c) => (
             <li>
               <a href={`/cursos/${c.slug}`}>
+                <Picture src={c.image} alt={c.name} ratio="4 / 3" sizes="(min-width: 60rem) 30vw, 90vw" />
                 <p class="eyebrow">{c.nextEdition?.startsAt ? fmtDay(c.nextEdition.startsAt) : 'Próximamente'}</p>
                 <h3>{c.name}</h3>
                 <p>{c.nextEdition?.full ? 'Lista de espera' : `${c.nextEdition?.seatsLeft} cupos disponibles`}</p>
@@ -115,6 +131,41 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
 <style>
   .hero {
     border-bottom: var(--border-w) solid var(--color-line);
+    background: var(--color-terracotta);
+    color: #fff;
+  }
+  .hero .eyebrow {
+    color: var(--color-sand);
+  }
+  .hero .btn--primary {
+    background: var(--color-cafe-deep);
+  }
+  .hero .btn--primary:hover {
+    background: var(--color-ink);
+  }
+  .hero :focus-visible {
+    outline-color: #fff;
+  }
+  .hero__frame {
+    position: relative;
+  }
+  .hero__seal {
+    position: absolute;
+    left: -1.5rem;
+    bottom: 2rem;
+    display: grid;
+    place-content: center;
+    width: 6.25rem;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--color-red);
+    border: var(--border-w) solid var(--color-ink);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    line-height: 1.05;
+    text-align: center;
+    transform: rotate(-9deg);
   }
   .hero__in {
     display: grid;
@@ -142,11 +193,12 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
   }
   :global(.hero__pic) {
     border: var(--border-w) solid var(--color-line);
-    box-shadow: 8px 8px 0 var(--color-ink);
+    box-shadow: 8px 8px 0 var(--color-cafe-deep);
   }
   .strip {
     border-bottom: var(--border-w) solid var(--color-line);
-    background: var(--color-surface);
+    background: var(--color-cafe-deep);
+    color: var(--color-inverse-ink);
   }
   .strip ul {
     display: flex;
@@ -164,6 +216,35 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
   }
   .strip a:hover {
     text-decoration: underline;
+    text-decoration-color: var(--color-terracotta);
+    text-underline-offset: 6px;
+    text-decoration-thickness: 2px;
+  }
+  .strip :focus-visible {
+    outline-color: var(--color-inverse-ink);
+  }
+  .kiln {
+    margin-top: var(--space-8);
+    border-block: var(--border-w) solid var(--color-line);
+    background:
+      linear-gradient(90deg, rgb(58 34 24 / 0.92) 0%, rgb(58 34 24 / 0.78) 45%, rgb(58 34 24 / 0.15) 100%),
+      url('/img/terracota.jpg') center / cover;
+    color: var(--color-inverse-ink);
+  }
+  .kiln__in {
+    padding-block: var(--space-8);
+  }
+  .kiln__text {
+    display: grid;
+    gap: var(--space-4);
+    justify-items: start;
+    max-width: 34rem;
+  }
+  .kiln h2 {
+    font-size: var(--text-2xl);
+  }
+  .kiln :focus-visible {
+    outline-color: var(--color-inverse-ink);
   }
   .head {
     display: flex;
@@ -186,14 +267,15 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
     display: grid;
     gap: var(--space-2);
     height: 100%;
-    padding: var(--space-5);
+    align-content: start;
+    padding: var(--space-4);
     border: var(--border-w) solid var(--color-line);
     text-decoration: none;
     transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
   }
   .svc a:hover {
     transform: translate(-3px, -3px);
-    box-shadow: var(--shadow-hard);
+    box-shadow: 6px 6px 0 var(--color-terracotta);
   }
   .band {
     background: var(--color-inverse-bg);
@@ -204,6 +286,10 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
     display: grid;
     gap: var(--space-4);
     justify-items: start;
+  }
+  .svc :global(.pic) {
+    margin-bottom: var(--space-2);
+    border: var(--border-w) solid var(--color-line);
   }
   .band .btn {
     box-shadow: 2px 2px 0 var(--color-inverse-ink);
@@ -218,6 +304,12 @@ const heroImage = featured?.items.find((p) => p.image)?.image ?? null;
     .hero__in {
       grid-template-columns: 1fr;
       gap: var(--space-5);
+    }
+    .hero__seal {
+      left: auto;
+      right: -0.5rem;
+      width: 5rem;
+      font-size: var(--text-base);
     }
   }
 </style>

@@ -82,8 +82,11 @@ h2 {
   box-shadow: none;
 }
 .btn--primary {
-  background: var(--color-inverse-bg);
-  color: var(--color-inverse-ink);
+  background: var(--color-terracotta);
+  color: #fff;
+}
+.btn--primary:hover {
+  background: var(--color-terracotta-deep);
 }
 .btn--danger {
   color: var(--color-danger);
@@ -152,7 +155,7 @@ h2 {
   letter-spacing: 0.06em;
 }
 .badge--solid {
-  background: var(--color-ink);
+  background: var(--color-red);
   color: var(--color-inverse-ink);
 }
 .badge--mute {
@@ -218,6 +221,7 @@ h2 {
   margin-top: var(--space-6);
 }
 .link-arrow {
+  color: var(--color-terracotta-deep);
   font-weight: 600;
   text-underline-offset: 4px;
 }

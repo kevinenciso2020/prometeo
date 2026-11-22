@@ -9,10 +9,11 @@ interface ApiBinding {
 /**
  * Llamada SSR (servidor → API). En Cloudflare un Worker no puede llamar a otro Worker de la
  * misma cuenta por su URL pública (error 1042), así que se usa el service binding `API`.
- * Sin binding (desarrollo local) o si falla, se usa `fetch` a PUBLIC_API_URL.
+ * Sin binding (desarrollo local) o si lanza, se usa `fetch` a PUBLIC_API_URL.
  */
 export async function serverFetch(path: string, init?: RequestInit): Promise<Response> {
-  const binding = (env as unknown as { API?: ApiBinding }).API;
+  // Solo en producción: en `astro dev` el servicio no existe y el binding devuelve error sin lanzar.
+  const binding = import.meta.env.PROD ? (env as unknown as { API?: ApiBinding }).API : undefined;
   if (binding) {
     try {
       return await binding.fetch(new Request(`https://api.internal${path}`, init));
