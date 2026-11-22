@@ -1,6 +1,7 @@
 /** Utilidades del lado servidor para consumir la API y datos del sitio. */
 import { serverFetch } from './api-server';
-export const API_URL: string = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
+/** Base de la API desde el NAVEGADOR: mismo origen (proxy en pages/api/[...path].ts), así las cookies de sesión son de primera parte. */
+export const API_URL = '/api';
 export const SITE_URL: string = (
   import.meta.env.PUBLIC_SITE_URL ?? 'http://localhost:4321'
 ).replace(/\/$/, '');
